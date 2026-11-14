@@ -140,6 +140,7 @@ pub fn state_title(s: &StatusSnapshot) -> &'static str {
         ("no_adapter", _) => "Bluetooth unavailable",
         (_, TrayState::Connected) => "Connected",
         (_, TrayState::Stale) => "Usage out of date",
+        ("usb_searching", TrayState::Searching) => "Looking for Clawdmeter on USB",
         (_, TrayState::Searching) => "Looking for Clawdmeter",
         (_, TrayState::AuthError) => "Signed out of Claude Code",
         (_, TrayState::Attention) => "Claude needs you",
