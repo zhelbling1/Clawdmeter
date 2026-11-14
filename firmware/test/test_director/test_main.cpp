@@ -394,12 +394,12 @@ static void test_page_has_the_one_clawd(void) {
     TEST_ASSERT_EQUAL_STRING("page", director_beat_name());
     TEST_ASSERT_TRUE(director_alert_active());
     TEST_ASSERT_EQUAL_STRING("needs you", director_alert_message());
-    director_tap(100);                            // dismisses, stays on the page
+    director_tap(100, 300);                       // dismisses, stays on the page
     TEST_ASSERT_FALSE(director_alert_active());
     TEST_ASSERT_TRUE(director_take_dismissed());
     TEST_ASSERT_FALSE(director_take_page_exit());
     world.activity = 0;
-    director_tap(100);                            // "show me the meters"
+    director_tap(100, 300);                       // "show me the meters"
     TEST_ASSERT_TRUE(director_take_page_exit());
     director_page_closed();
     TEST_ASSERT_FALSE(director_on_page());
