@@ -50,6 +50,7 @@ in-front gap) are in `gaming/props.js`.
 | Level up! | `gaming/levelup.js` | active | Old School RuneScape woodcutting: chopping a yew until the level-up fireworks. |
 | Cardboard box | `gaming/box.js` | active | Metal Gear Solid (1998): hiding under a cardboard box, bandana and sneaking suit, the red "!" alert. |
 | Barrel roll | `gaming/barrelroll.js` | active | Star Fox 64 (1997): "Do a barrel roll!" Generic aviator costume; no ships or characters. |
+| Rise and shine | `gaming/hl2.js` | active | Half-Life 2 (2004): a Clawd in an orange-and-grey hazard suit (little glasses, goatee, red crowbar) smashes crates while a Clawd in a blue-grey suit with a briefcase flickers in, watches, straightens his tie ("WAKE UP") and glitches away. Costumes only: no lambda or other logos, no game UI or sprites. |
 ## Dances (`music/`)
 
 Dance moves only: no song titles, no lyrics, no likenesses. `music/props.js`
