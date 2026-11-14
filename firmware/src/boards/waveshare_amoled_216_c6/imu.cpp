@@ -22,6 +22,8 @@ static uint32_t candidate_since    = 0;
 static uint32_t last_poll_ms       = 0;
 static bool     imu_ok             = false;
 static float    accel_scale        = 0;      // g per LSB, set by configAccel()
+static float    last_ax = 0, last_ay = 0, last_az = 0;   // g, the latest poll (pet mode)
+static bool     have_accel         = false;
 
 // Dead zone: the dominant axis must beat the other by 25 % before we commit,
 // otherwise (near 45°, e.g. a tilted stand) the current quadrant is kept.
@@ -78,6 +80,8 @@ void imu_hal_tick(void) {
     if (!imu.readAccelRaw(rx, ry, rz)) return;
     float ax = rx * accel_scale;  // g
     float ay = ry * accel_scale;
+    last_ax = ax; last_ay = ay; last_az = rz * accel_scale;
+    have_accel = true;
 
     uint8_t target = accel_to_rotation(ax, ay);
     if (target == 255 || target == current_rotation) {
@@ -94,3 +98,10 @@ void imu_hal_tick(void) {
 }
 
 uint8_t imu_hal_rotation_quadrant(void) { return current_rotation; }
+
+bool imu_hal_accel(float* x, float* y, float* z) {
+    if (!have_accel) return false;
+    imu_screen_axes(current_rotation, last_ax, last_ay, x, y);
+    *z = last_az;
+    return true;
+}

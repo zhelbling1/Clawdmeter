@@ -30,10 +30,13 @@ pub struct HookSpec {
     pub args: &'static str,
 }
 
-/// The five hooks: the attention card's four plus Stop, all logging events.
-pub const HOOKS: [HookSpec; 5] = [
+/// The six hooks: the attention card's four, Stop, and a failed tool call
+/// (a failing test run exits non-zero, which Claude Code reports as
+/// `PostToolUseFailure`, not `PostToolUse`), all logging events.
+pub const HOOKS: [HookSpec; 6] = [
     HookSpec { event: "UserPromptSubmit", matcher: None, args: "clear event" },
     HookSpec { event: "PostToolUse", matcher: None, args: "clear event" },
+    HookSpec { event: "PostToolUseFailure", matcher: None, args: "clear event" },
     HookSpec { event: "Stop", matcher: None, args: "event" },
     HookSpec { event: "Notification", matcher: None, args: "alert event" },
     HookSpec { event: "PreToolUse", matcher: Some("AskUserQuestion"), args: "alert event" },
@@ -565,9 +568,24 @@ mod tests {
         assert_eq!(j["hooks"]["Stop"][0]["hooks"][0]["command"], format!("{EXE} hook event"));
         assert_eq!(j["hooks"]["PreToolUse"][0]["matcher"], "AskUserQuestion");
         assert_eq!(j["hooks"]["PostToolUse"][0]["hooks"][0]["type"], "command");
+        // A failing test run exits non-zero: Claude Code reports it here.
+        assert_eq!(j["hooks"]["PostToolUseFailure"][0]["hooks"][0]["command"], format!("{EXE} hook clear event"));
         assert_eq!(status(Some(&out), exe()), HookStatus::Installed);
         assert_eq!(status(None, exe()), HookStatus::Missing);
         assert_eq!(merge(Some(&out), exe()).unwrap(), out, "idempotent");
+    }
+
+    // Hooks installed before PostToolUseFailure was one of ours read as
+    // needing an update, and the update adds it.
+    #[test]
+    fn older_install_without_the_failure_hook_is_partial() {
+        let mut j = v(&merge(None, exe()).unwrap());
+        j["hooks"].as_object_mut().unwrap().remove("PostToolUseFailure");
+        let older = serde_json::to_string_pretty(&j).unwrap();
+        assert_eq!(status(Some(&older), exe()), HookStatus::Partial);
+        let updated = merge(Some(&older), exe()).unwrap();
+        assert_eq!(status(Some(&updated), exe()), HookStatus::Installed);
+        assert!(v(&updated)["hooks"]["PostToolUseFailure"].is_array());
     }
 
     #[test]

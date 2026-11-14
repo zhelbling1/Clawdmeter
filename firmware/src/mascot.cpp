@@ -11,6 +11,7 @@
 // ─── Sprites ─────────────────────────────────────────────────────────────────
 static lv_obj_t*      img = NULL;        // corner Clawd
 static uint8_t*       buf = NULL;        // planar RGB565A8, sized for the largest corner act
+static size_t         buf_bytes = 0;
 static lv_image_dsc_t dsc;
 static lv_obj_t*      big_img = NULL;    // lurk + attention Clawd (PSRAM only)
 static uint8_t*       big_buf = NULL;
@@ -76,10 +77,14 @@ static const uint16_t HURRY_PCT = 250;        // hurrying home from a lurk trip
 // panel) would be clipped by the top edge. It swaps for this official act,
 // which always fits, instead.
 static const char* const TALL_FALLBACK = "dancing";
-// Everything the corner buffer must fit.
+// Everything the corner buffer must fit. Trumpet (the tests-passed fanfare)
+// and magnifier (looking for the bug when they fail) are wider persona acts;
+// a frame takes w*h cells, so the buffer is the largest area, not the
+// widest times the tallest.
 static const char* const CORNER_ANIMS[] = {
-    "walking", "waving", "pointing", "dancing", "jumping happy",
+    "walking", "waving", "pointing", "dancing", "jumping happy", "trumpet", "magnifier",
 };
+static size_t corner_bytes(const ClawdAnim* a) { return (size_t)(a->w * cell) * (a->h * cell) * 3; }
 
 // ─── Rendering ───────────────────────────────────────────────────────────────
 // One frame into a planar RGB565A8 image (alpha 0 outside the art), widget
@@ -125,8 +130,12 @@ static void show(lv_obj_t* o, bool on) {
 static int  left_edge(int y)  { int a, b; panel_row_span(screen_w, screen_h, round_panel, y, &a, &b); return a; }
 static int  right_edge(int y) { int a, b; panel_row_span(screen_w, screen_h, round_panel, y, &a, &b); return b; }
 
+// Every animation shares the 55x37 art stage and its crop starts at ox:
+// the core poses at the idle origin, the persona acts further left (the
+// trumpet's crop starts 13 cells before his body), so his body stays put.
 static void draw_corner(void) {
-    render(anim, frame, facing < 0, &dsc, buf, img, cell, x, feet_y);
+    const int dx = (anim && walk_anim) ? (anim->ox - walk_anim->ox) * cell : 0;
+    render(anim, frame, facing < 0, &dsc, buf, img, cell, x + (facing < 0 ? -dx : dx), feet_y);
 }
 static void draw_big(void) {
     render(anim, frame, mode == M_BIG_OUT, &big_dsc, big_buf, big_img,
@@ -235,14 +244,11 @@ lv_obj_t* mascot_create(lv_obj_t* parent, int sx, int feet, int c) {
     if (!walk_anim) return NULL;
     clawd_rng_seed(&rng, millis() ^ 0xC1A3D);
 
-    int mw = 0, mh = 0;
+    size_t bytes = 0;
     for (const char* n : CORNER_ANIMS) {
         const ClawdAnim* a = clawd_anim(n);
-        if (!a) continue;
-        if (a->w > mw) mw = a->w;
-        if (a->h > mh) mh = a->h;
+        if (a && corner_bytes(a) > bytes) bytes = corner_bytes(a);
     }
-    const size_t bytes = (size_t)(mw * c) * (mh * c) * 3;
 
     const int mind = caps.width < caps.height ? caps.width : caps.height;
     lurk_cell = mind / SPLASH_GRID;
@@ -266,6 +272,7 @@ lv_obj_t* mascot_create(lv_obj_t* parent, int sx, int feet, int c) {
     buf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
     if (!buf) buf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!buf) return NULL;
+    buf_bytes = bytes;
     big_buf = big_bytes ? (uint8_t*)heap_caps_malloc(big_bytes, MALLOC_CAP_SPIRAM) : NULL;
 
     img = lv_image_create(parent);
@@ -310,6 +317,11 @@ bool mascot_act(const char* name, uint8_t times, bool snappy, uint16_t speed_pct
     if (feet_y - a->h * cell < 0) {
         const ClawdAnim* f = clawd_anim(TALL_FALLBACK);
         if (f && feet_y - f->h * cell >= 0) a = f;
+    }
+    if (corner_bytes(a) > buf_bytes) {        // not one the buffer was sized for
+        const ClawdAnim* f = clawd_anim(TALL_FALLBACK);
+        if (!f || corner_bytes(f) > buf_bytes) return false;
+        a = f;
     }
     start_frames(a);
     if (snappy && a->frame_count > 1) frame = 1;

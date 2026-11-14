@@ -34,3 +34,16 @@ void face_apply_theme(void);   // pick up a new palette (TH_CLAWD, TH_EYE)
 // the resting glance, far eye 1.5x on top), hold for hold_ms, then come back
 // to you. face_busy() until they're back.
 void face_look_at_x(int x, uint32_t hold_ms);
+
+// ---- Pet mode (pet.h) ----
+// The pet drives the eyes directly while it's up; face_pet_reset() puts
+// everything back (also done on every rise and drop).
+// Per-eye offset in px on top of the glance (0 = left eye, 1 = right).
+void face_look_each(int dx0, int dy0, int dx1, int dy1);
+// Eye shape: height and width in permille of the open eye; `from_bottom`
+// lowers the top lid instead of shrinking about the centre (sleepy, grumpy).
+void face_set_eye_shape(int h_pm, int w_pm, bool from_bottom);
+void face_set_squint(bool on);   // the > < chevrons, held (happy)
+void face_pet_reset(void);
+// An eye's resting centre in screen px (props placed on the face).
+void face_eye_center(int eye, int* x, int* y);

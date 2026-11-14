@@ -29,7 +29,8 @@ struct UsageData {
     // the signal logic treats exactly like "no hooks installed".
     int8_t   activity;       // `a`  0-3 tool-call activity level; -1 = absent
     char     event;          // `e`  latest hook event: 'p' prompt, 's' stop,
-                             //      'b' back after a gap; '\0' = absent. Other
+                             //      'b' back after a gap, 't' / 'f' a test run
+                             //      passed / failed; '\0' = absent. Other
                              //      chars pass through for forward compat.
     bool     has_event_seq;  // `es` present
     uint32_t event_seq;      // `es` sequence number; react once per change

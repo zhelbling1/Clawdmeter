@@ -17,6 +17,9 @@ pub enum HookKind {
     UserPromptSubmit,
     /// `PostToolUse`: a tool finished (also the end of a permission wait).
     PostToolUse,
+    /// `PostToolUseFailure`: a tool call failed (a shell command's non-zero
+    /// exit, a timeout). Counts as a tool call like `PostToolUse`.
+    PostToolUseFailure,
     /// `Stop`: the turn is done.
     Stop,
     /// `Notification`: Claude needs the user.
@@ -33,6 +36,7 @@ impl HookKind {
         match s {
             "UserPromptSubmit" => HookKind::UserPromptSubmit,
             "PostToolUse" => HookKind::PostToolUse,
+            "PostToolUseFailure" => HookKind::PostToolUseFailure,
             "Stop" => HookKind::Stop,
             "Notification" => HookKind::Notification,
             "PreToolUse" => HookKind::PreToolUse,
@@ -43,7 +47,14 @@ impl HookKind {
     /// prompt, a tool call, the end of a turn. That starts a 5-hour window
     /// when none is running.
     pub fn sends_messages(&self) -> bool {
-        matches!(self, HookKind::UserPromptSubmit | HookKind::PostToolUse | HookKind::PreToolUse | HookKind::Stop)
+        matches!(
+            self,
+            HookKind::UserPromptSubmit
+                | HookKind::PostToolUse
+                | HookKind::PostToolUseFailure
+                | HookKind::PreToolUse
+                | HookKind::Stop
+        )
     }
 }
 
@@ -255,7 +266,17 @@ pub enum EventCode {
     Stop,
     /// `b`: a prompt after 10+ quiet minutes ("you're back").
     Back,
+    /// `t`: a test run passed (the hook's `TestPass` line).
+    TestPass,
+    /// `f`: a test run failed (`TestFail`).
+    TestFail,
 }
+
+/// The events.log name the hook writes after a test run that passed
+/// ([`crate::testrun`]).
+pub const TEST_PASS_EVENT: &str = "TestPass";
+/// The events.log name for a test run that failed.
+pub const TEST_FAIL_EVENT: &str = "TestFail";
 
 impl EventCode {
     /// The one-letter payload value.
@@ -264,6 +285,8 @@ impl EventCode {
             EventCode::Prompt => "p",
             EventCode::Stop => "s",
             EventCode::Back => "b",
+            EventCode::TestPass => "t",
+            EventCode::TestFail => "f",
         }
     }
 }
@@ -296,11 +319,11 @@ pub struct Activity {
     pub last_prompt_ts: Option<i64>,
     /// Newest `Stop`.
     pub last_stop_ts: Option<i64>,
-    /// Newest `PostToolUse`.
+    /// Newest `PostToolUse` or `PostToolUseFailure`.
     pub last_tool_ts: Option<i64>,
     /// Latest `e` and its sequence number `es` (0 = none yet).
     pub latest: Option<EventCode>,
-    /// Sequence number, bumped on every live p/s/b.
+    /// Sequence number, bumped on every live p/s/b/t/f.
     pub seq: u32,
     /// Any event has ever been seen (the hooks are installed).
     pub hooks_seen: bool,
@@ -318,6 +341,8 @@ pub enum Signal {
     Stop,
     /// A tool ran.
     Tool,
+    /// A test run finished (`e` = `t` / `f`).
+    Test,
     /// Something else (Notification, PreToolUse...).
     Other,
 }
@@ -339,7 +364,7 @@ impl Activity {
             *e = (*e).max(ev.ts);
         }
         match ev.kind {
-            HookKind::PostToolUse => {
+            HookKind::PostToolUse | HookKind::PostToolUseFailure => {
                 self.tool_ts.push_back(ev.ts);
                 self.last_tool_ts = Some(ev.ts);
             }
@@ -363,7 +388,11 @@ impl Activity {
                 self.bump(EventCode::Stop);
                 Signal::Stop
             }
-            HookKind::PostToolUse => Signal::Tool,
+            HookKind::PostToolUse | HookKind::PostToolUseFailure => Signal::Tool,
+            HookKind::Other(ref name) if name == TEST_PASS_EVENT || name == TEST_FAIL_EVENT => {
+                self.bump(if name == TEST_PASS_EVENT { EventCode::TestPass } else { EventCode::TestFail });
+                Signal::Test
+            }
             _ => Signal::Other,
         }
     }
@@ -475,6 +504,25 @@ mod tests {
         assert_eq!(a.latest, Some(EventCode::Back));
         a.prune(t + 2000);
         assert_eq!(a.sessions_active(t + 2000), 0);
+    }
+
+    #[test]
+    fn test_runs_are_events() {
+        let mut a = Activity::default();
+        let t = 1_000_000;
+        assert_eq!(a.ingest(&ev(t, "UserPromptSubmit", "s1")), Signal::Prompt { back: false });
+        // A failed shell call is a tool call too (activity, working).
+        assert_eq!(a.ingest(&ev(t + 1, "PostToolUseFailure", "s1")), Signal::Tool);
+        assert_eq!(a.level(t + 2), 1);
+        assert_eq!(a.ingest(&ev(t + 1, TEST_FAIL_EVENT, "s1")), Signal::Test);
+        assert_eq!((a.latest, a.seq), (Some(EventCode::TestFail), 2));
+        assert_eq!(a.ingest(&ev(t + 9, TEST_PASS_EVENT, "s1")), Signal::Test);
+        assert_eq!((a.latest.map(EventCode::as_str), a.seq), (Some("t"), 3));
+        assert!(HookKind::parse("PostToolUseFailure").sends_messages());
+        // Seeded history never replays a party.
+        let mut b = Activity::default();
+        b.seed(&[ev(t, TEST_PASS_EVENT, "s1")]);
+        assert_eq!((b.latest, b.seq), (None, 0));
     }
 
     #[test]

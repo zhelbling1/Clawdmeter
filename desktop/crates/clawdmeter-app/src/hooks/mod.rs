@@ -10,10 +10,15 @@
 //!   turned off, see [`clawdmeter_core::attention::AlertKind`]);
 //! * `clear` touches `clear-<session id>`;
 //! * `event` appends `<unix_ts> <hook_event_name> <session_id>` to
-//!   `events.log`, rolling it to `events.log.1` past 256 KB.
+//!   `events.log`, rolling it to `events.log.1` past 256 KB. After a shell
+//!   tool call that ran tests (`PostToolUse` / `PostToolUseFailure`) it adds
+//!   a second line, `TestPass` or `TestFail`, when the output gives a clear
+//!   verdict ([`clawdmeter_core::testrun`]); the device celebrates or goes
+//!   looking for the bug.
 //!
 //! `alert event` / `clear event` do both from one read of stdin. Only the
-//! event name and session id are recorded, never the prompt or the tool call.
+//! event name and session id are recorded (and a test run's verdict), never
+//! the prompt, the command or its output.
 //! Hook stdout can reach the model, so the hook prints nothing and always
 //! exits 0. The file formats match the legacy `attention-hook.sh` byte for
 //! byte apart from the alert's `k`, which older readers ignore.
@@ -138,8 +143,45 @@ pub fn event_line(v: &Value, now_unix: u64) -> Option<String> {
     })
 }
 
+/// After a shell tool call that ran tests, the verdict as a second line:
+/// `<ts> TestPass|TestFail <session> [<config dir>]`. `PostToolUse` carries
+/// the output in `tool_response` (`stdout`, `stderr`, `interrupted`, or a
+/// plain string), `PostToolUseFailure` in `error` (`Exit code N` and the
+/// output) with `is_interrupt`. `None` when it wasn't a test run or the
+/// output doesn't say.
+pub fn test_line(v: &Value, now_unix: u64) -> Option<String> {
+    use clawdmeter_core::{events, testrun};
+    let event = v.get("hook_event_name").and_then(Value::as_str)?;
+    if !testrun::is_shell_tool(v.get("tool_name").and_then(Value::as_str)?) {
+        return None;
+    }
+    let cmd = v.pointer("/tool_input/command").and_then(Value::as_str)?;
+    let passed = match event {
+        "PostToolUse" => {
+            let r = v.get("tool_response");
+            let text = |k: &str| r.and_then(|r| r.get(k)).and_then(Value::as_str).unwrap_or("");
+            let interrupted = r.and_then(|r| r.get("interrupted")).and_then(Value::as_bool).unwrap_or(false);
+            let stdout = r.and_then(Value::as_str).unwrap_or_else(|| text("stdout"));
+            testrun::test_outcome(cmd, stdout, text("stderr"), interrupted)
+        }
+        "PostToolUseFailure" => {
+            let error = v.get("error").and_then(Value::as_str).unwrap_or("");
+            let interrupted = v.get("is_interrupt").and_then(Value::as_bool).unwrap_or(false);
+            testrun::failure_outcome(cmd, error, interrupted)
+        }
+        _ => None,
+    }?;
+    let mut ev = v.clone();
+    let name = if passed { events::TEST_PASS_EVENT } else { events::TEST_FAIL_EVENT };
+    ev["hook_event_name"] = Value::String(name.to_owned());
+    event_line(&ev, now_unix)
+}
+
 fn log_event(v: &Value, dir: &Path, now_unix: u64) -> io::Result<()> {
-    let Some(line) = event_line(v, now_unix) else { return Ok(()) };
+    let Some(mut line) = event_line(v, now_unix) else { return Ok(()) };
+    if let Some(t) = test_line(v, now_unix) {
+        line.push_str(&t);
+    }
     let f = dir.join("events.log");
     if fs::metadata(&f).is_ok_and(|m| m.is_file() && m.len() > EVENTS_ROLL_BYTES) {
         let _ = fs::rename(&f, dir.join("events.log.1"));
@@ -314,6 +356,41 @@ mod tests {
         assert_eq!(
             alert_json(&json!({"message": "a\u{7f}\"b"})).unwrap(),
             "{\"k\":\"permission\",\"m\":\"a\\u007f\\\"b\",\"s\":null}\n"
+        );
+    }
+
+    #[test]
+    fn test_verdict_lines() {
+        let tp = "/h/.claude/projects/p/s.jsonl";
+        let pass = json!({"hook_event_name": "PostToolUse", "session_id": "s1", "transcript_path": tp,
+            "tool_name": "Bash", "tool_input": {"command": "cd desktop && cargo test"},
+            "tool_response": {"stdout": "test result: ok. 3 passed; 0 failed\n", "stderr": "", "interrupted": false}});
+        assert_eq!(test_line(&pass, 7).as_deref(), Some("7 TestPass s1 /h/.claude\n"));
+        // A failing run exits non-zero: Claude Code fires PostToolUseFailure.
+        let fail = json!({"hook_event_name": "PostToolUseFailure", "session_id": "s1", "tool_name": "PowerShell",
+            "tool_input": {"command": "cargo test --workspace"},
+            "error": "Exit code 101\ntest result: FAILED. 1 passed; 1 failed\n", "is_interrupt": false});
+        assert_eq!(test_line(&fail, 8).as_deref(), Some("8 TestFail s1\n"));
+        let interrupted = json!({"hook_event_name": "PostToolUseFailure", "session_id": "s1", "tool_name": "Bash",
+            "tool_input": {"command": "cargo test"}, "error": "test result: FAILED. 0 passed; 1 failed", "is_interrupt": true});
+        assert_eq!(test_line(&interrupted, 9), None);
+        let other_tool = json!({"hook_event_name": "PostToolUse", "tool_name": "Read",
+            "tool_input": {"command": "cargo test"}, "tool_response": "test result: ok. 1 passed"});
+        assert_eq!(test_line(&other_tool, 9), None);
+        let not_tests = json!({"hook_event_name": "PostToolUse", "tool_name": "Bash",
+            "tool_input": {"command": "cargo build"}, "tool_response": {"stdout": "test result: ok. 1 passed"}});
+        assert_eq!(test_line(&not_tests, 9), None);
+        let plain = json!({"hook_event_name": "PostToolUse", "session_id": "s2", "tool_name": "Bash",
+            "tool_input": {"command": "pytest"}, "tool_response": "4 passed in 0.1s"});
+        assert_eq!(test_line(&plain, 10).as_deref(), Some("10 TestPass s2\n"));
+
+        // `clear event` on PostToolUse writes both lines, the verdict second;
+        // the command and its output never reach the log.
+        let d = dir("verdict");
+        run(Mode::parse(&args("clear event")), &pass.to_string(), &d, 11);
+        assert_eq!(
+            fs::read_to_string(d.join("events.log")).unwrap(),
+            "11 PostToolUse s1 /h/.claude\n11 TestPass s1 /h/.claude\n"
         );
     }
 

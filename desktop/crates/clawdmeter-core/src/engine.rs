@@ -259,6 +259,9 @@ impl Engine {
                 self.scheduler.on_stop(now);
                 self.last_event_ts = Some(now);
             }
+            // A test verdict goes out like a prompt or a stop (it doesn't
+            // change the poll cadence).
+            Signal::Test => self.last_event_ts = Some(now),
             Signal::Tool | Signal::Other => {}
         }
     }
@@ -1036,6 +1039,15 @@ mod tests {
         // Old events stop riding along after a minute.
         let w = e.next_write(T0 + 200, HostClock::default()).unwrap();
         assert_eq!((w.payload.e, w.payload.es), (None, None));
+
+        // A test verdict long after the prompt still goes out at once.
+        e.on_hook_event(&ev(T0 + 400, crate::events::TEST_PASS_EVENT), T0 + 400);
+        let w = write(&mut e, T0 + 400).unwrap();
+        assert_eq!(w.kind, WriteKind::Event);
+        assert_eq!((w.payload.e.as_deref(), w.payload.es), (Some("t"), Some(3)));
+        e.on_hook_event(&ev(T0 + 410, crate::events::TEST_FAIL_EVENT), T0 + 410);
+        let w = write(&mut e, T0 + 410).unwrap();
+        assert_eq!((w.payload.e.as_deref(), w.payload.es), (Some("f"), Some(4)));
     }
 
     #[test]

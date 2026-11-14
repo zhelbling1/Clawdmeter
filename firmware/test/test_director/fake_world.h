@@ -27,5 +27,19 @@ struct OnScreen {
 };
 OnScreen fake_on_screen(void);
 bool     fake_corner_seated_still(void);   // in his seat, not acting or walking
+bool     fake_corner_acting(void);         // playing a commanded or idle act in his seat
+extern const char* fake_last_act;          // the last act mascot_act accepted
+
+// Pet mode, the party and the effect screensavers (pet.h, party.h, savers.h).
+#define FAKE_HEADER_H 60                   // ui_header_hit: y above this
+bool     fake_pet_active(void);
+int      fake_pet_cheers(void);            // pet_celebrate calls
+int      fake_pet_hunts(void);             // pet_bug calls
+int      fake_confetti(void);              // party_confetti calls
+int      fake_glows(void);                 // party_glow calls
+uint32_t fake_glow_rgb(void);              // the last glow's colour
+bool     fake_saver_active(void);
+int      fake_saver_kind(void);
+void     fake_party_reset(void);
 bool     fake_attention_animating(void);   // any part of the attention animation on screen
 int      fake_clawds(const OnScreen& s);

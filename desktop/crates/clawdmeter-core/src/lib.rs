@@ -15,6 +15,7 @@
 //! * [`payload`]: the JSON the firmware parses; [`buttons`]: what its buttons do.
 //! * [`themes`]: the device's colour presets.
 //! * [`rate`]: the slow-clock mood.
+//! * [`testrun`]: did a shell tool call run tests, and did they pass.
 //! * [`engine`]: all of the above as one I/O-free state machine.
 //! * [`autostart`], [`launch`], [`platform`]: start-at-login, the path to
 //!   launch the app by, and host queries.
@@ -37,6 +38,7 @@ pub mod platform;
 pub mod probe;
 pub mod rate;
 pub mod selector;
+pub mod testrun;
 pub mod themes;
 pub mod usage;
 

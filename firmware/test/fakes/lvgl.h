@@ -19,6 +19,7 @@ static inline lv_indev_t* lv_indev_get_next(lv_indev_t*) { return (lv_indev_t*)0
 static inline void lv_indev_add_event_cb(lv_indev_t*, lv_event_cb_t, int, void*) {}
 static inline void lv_indev_get_point(lv_indev_t*, lv_point_t* p) { p->x = 0; p->y = 0; }
 static inline int32_t lv_display_get_horizontal_resolution(lv_display_t*) { return 480; }
+static inline int32_t lv_display_get_vertical_resolution(lv_display_t*) { return 480; }
 
 extern "C" {
 #endif

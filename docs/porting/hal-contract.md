@@ -79,6 +79,7 @@ codec alone does not mean the firmware supports sound.
 | `imu_hal_init`               | Bring up the accelerometer. |
 | `imu_hal_tick`               | Sample the accelerometer at a low rate (~10 Hz) and update the rotation state with hysteresis. |
 | `imu_hal_rotation_quadrant`  | Current rotation, 0..3 (quarter turns CW). Used by `display_hal_draw_bitmap` on rotation-capable boards. Boards without rotation always return 0. |
+| `imu_hal_accel`              | Optional. The latest sample in g, screen axes (+x right, +y down the UI as drawn now; `imu_screen_axes` maps a QMI8658's x/y by quadrant), for pet mode's tilt and shake. A weak default (`src/imu_accel_default.cpp`) returns false; boards without an accelerometer don't implement it. |
 
 ## `board_info_hal.h` (optional)
 

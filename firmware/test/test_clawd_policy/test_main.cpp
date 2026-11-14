@@ -227,6 +227,62 @@ static void test_tap_keeps_its_meaning_off_the_meters_and_in_minimal(void) {
     TEST_ASSERT_EQUAL_INT(TAP_NONE, clawd_tap_react(&in));
 }
 
+// The header (the title, or Clawd in his seat) is pet mode, but only with
+// live meters; elsewhere, stale, minimal or off the meters it's what any
+// tap is.
+static void test_header_tap_is_pet_mode(void) {
+    TapInput in = tap_in(CORNER_FREE);
+    TEST_ASSERT_EQUAL_INT(TAP_PET, clawd_tap_react_at(&in, true, true));
+    in = tap_in(CORNER_OUT);
+    TEST_ASSERT_EQUAL_INT(TAP_PET, clawd_tap_react_at(&in, true, true));
+    in = tap_in(CORNER_FREE);
+    TEST_ASSERT_EQUAL_INT(TAP_PEEK_HOP, clawd_tap_react_at(&in, false, true));
+    TEST_ASSERT_EQUAL_INT(TAP_PEEK_HOP, clawd_tap_react_at(&in, true, false));   // stale: a peek
+    in.minimal = true;
+    TEST_ASSERT_EQUAL_INT(TAP_NONE, clawd_tap_react_at(&in, true, true));
+    in = tap_in(CORNER_FREE);
+    in.on_meters = false;
+    TEST_ASSERT_EQUAL_INT(TAP_NONE, clawd_tap_react_at(&in, true, true));
+}
+
+// Tests passing / failing: the glow always, the party or the bug hunt on a
+// changed verdict, the same verdict again once per cooldown; nothing in
+// minimal mode, the glow alone at No-nonsense.
+static void test_test_runs_glow_and_react_on_a_change(void) {
+    TestParty p;
+    test_party_clear(&p);
+    uint32_t now = 1000;
+    TestReact r = clawd_test_react(&p, true, false, now, &T);
+    TEST_ASSERT_TRUE(r.glow);
+    TEST_ASSERT_TRUE(r.confetti);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_FANFARE, r.act);
+    r = clawd_test_react(&p, true, false, now += 30 * SEC, &T);   // passing again soon: glow only
+    TEST_ASSERT_TRUE(r.glow);
+    TEST_ASSERT_FALSE(r.confetti);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_NONE, r.act);
+    r = clawd_test_react(&p, false, false, now += 10 * SEC, &T);  // broke it: he goes looking
+    TEST_ASSERT_TRUE(r.glow);
+    TEST_ASSERT_FALSE(r.confetti);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_BUG_HUNT, r.act);
+    r = clawd_test_react(&p, false, false, now += 10 * SEC, &T);  // still broken
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_NONE, r.act);
+    r = clawd_test_react(&p, true, false, now += 10 * SEC, &T);   // fixed: the party, cooldown or not
+    TEST_ASSERT_TRUE(r.confetti);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_FANFARE, r.act);
+    r = clawd_test_react(&p, true, false, now += T.party_cooldown_ms, &T);   // a while later: again
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_FANFARE, r.act);
+    r = clawd_test_react(&p, false, true, now += T.party_cooldown_ms, &T);   // minimal: nothing
+    TEST_ASSERT_FALSE(r.glow);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_NONE, r.act);
+    ClawdTuning still;
+    clawd_tuning_scaled(&T, 1, &still);
+    test_party_clear(&p);
+    r = clawd_test_react(&p, true, false, now, &still);
+    TEST_ASSERT_TRUE(r.glow);
+    TEST_ASSERT_FALSE(r.confetti);
+    TEST_ASSERT_EQUAL_INT(TEST_ACT_NONE, r.act);
+}
+
 static void test_peek_face_is_curious_for_five_minutes(void) {
     TEST_ASSERT_EQUAL_UINT32(5 * MIN, T.peek_curious_ms);
     const uint32_t up = 7 * SEC;
@@ -401,6 +457,8 @@ int main(int, char**) {
     RUN_TEST(test_tap_keeps_its_meaning_off_the_meters_and_in_minimal);
     RUN_TEST(test_peek_looks_toward_the_tap);
     RUN_TEST(test_peek_face_is_curious_for_five_minutes);
+    RUN_TEST(test_header_tap_is_pet_mode);
+    RUN_TEST(test_test_runs_glow_and_react_on_a_change);
     RUN_TEST(test_curiosity_runs_out_before_the_screensaver_could_start);
     RUN_TEST(test_curious_glances_keep_going_back_to_the_tap);
     RUN_TEST(test_attention_over_a_peek_ends_on_the_meters);

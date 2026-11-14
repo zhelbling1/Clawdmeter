@@ -19,6 +19,14 @@ void ui_update_battery(int percent, bool charging, bool usb_power);  // percent 
 // the pairing hint or the stale-data idle view.
 bool ui_meters_live(void);
 
+// A point in the header band (the corner Clawd's seat, the title, the
+// battery: everything above the first card). A tap there is pet mode
+// (clawd_tap_react_at), and in pet mode it's the way back.
+bool ui_header_hit(int x, int y);
+
+// The local hour (0-23) of the clock the app sends, -1 without one.
+int ui_local_hour(void);
+
 // The pairing hint (shown while disconnected) is on screen.
 bool ui_pair_hint_visible(void);
 

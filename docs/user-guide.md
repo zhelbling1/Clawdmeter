@@ -133,7 +133,13 @@ remain in place. On macOS, move Clawdmeter to Applications before setting up
 hooks or Start at login; on Windows, extract it from the zip first.
 
 Hooks let Clawd react to activity and show alerts. The local event log
-contains timestamps, event types, and session IDs. Alerts also store the
+contains timestamps, event types, and session IDs. After a `Bash` or
+`PowerShell` call that ran tests (`cargo test`, `pio test`, `pytest`,
+`npm test`, `go test` and the like), the hook also logs whether they passed
+or failed, read from the output; the command and its output are not
+stored. Claude Code reports a failing command as `PostToolUseFailure`, so
+the app installs a hook for it too: if you set up hooks with an older
+version, **Hooks** shows them as needing an update. Alerts also store the
 notification message or the first question from `AskUserQuestion`, which
 is sent to the device. Prompt text and full tool-call payloads are not
 written to the event log.
@@ -199,6 +205,35 @@ in front of the panels. Tap a show or the screensaver to send him back to
 his seat.
 Tap the meters to bring Clawd's face up to the glass; tap again to send him
 back. A tap that wakes a sleeping panel only wakes it.
+
+**Pet mode**: tap the top of the screen (the clock, the battery, or Clawd in
+his seat) and his face comes up to be petted. Tap it for a boop (too many in
+a row and he gets grumpy), rub sideways to stroke it (he's happy), and move
+your finger around: his eyes follow it. On boards with a motion sensor (the
+2.16-inch AMOLED boards) tilting the board rolls his eyes that way and
+shaking it makes him dizzy. He has moods of his own: sweating when usage is
+at 90% or more, watching a little dot while Claude works, sleepy at night
+(with the clock on), bored when left alone, and the odd sneeze, hiccup, yawn
+or morning stretch. Tap the top of the screen again or press a button to go
+back to the meters; he also goes back by himself after 2 minutes without a
+touch, and an alert always takes over. Pet mode needs live meters: on stale
+data or while pairing, a tap at the top is an ordinary peek.
+
+**The party**: when Claude runs your tests (`cargo test`, `pio test`,
+`pytest`, `npm test`, `go test` and the like) the edge of the screen glows
+green if they passed and red if they failed. A pass also gets confetti and
+Clawd's trumpet fanfare; a fail sends him off with his magnifying glass to
+look for the bug. The same result again within 5 minutes only glows, so a
+test loop isn't a party every minute, but going from failing to passing
+always is. Confetti also marks a fresh 5-hour window. In pet mode his face
+cheers or looks around instead. This needs the hooks (see **Hooks and
+privacy**); **No-nonsense** keeps only the glow.
+
+**Screensavers**: when you're away, the screensaver takes turns between
+Clawd's resting face and three moving effects (a starfield, a rain of code,
+and drifting dots joined into constellations), which change every few
+minutes. They're mostly black and keep moving, to spare an OLED panel. Any
+tap, button or new prompt ends them.
 
 The device names what the session is waiting for in one short line:
 **Question for you**, **Permission needed!**, **Waiting for you!** (an idle

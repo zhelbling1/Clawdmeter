@@ -10,7 +10,9 @@
 //           full size in front of them (performer.h): a treat after a busy
 //           stretch, or a calm dip during the screensaver.
 //   face    the #198 face resting on the glass (face.h): the screensaver,
-//           and the peek when you tap the meters.
+//           the peek when you tap the meters, and pet mode when you tap the
+//           header (pet.h). The screensaver also takes turns with effects
+//           (savers.h) that have no Clawd at all.
 //
 // Rules of continuity: only ever one Clawd (corner sprite, full-size sprite,
 // performer or face); he enters and leaves through an edge; the screen never
@@ -18,8 +20,9 @@
 // meters"; on the meters themselves it's tapping the aquarium: he reacts.
 //
 // Beats (design system §09): notice, show, tap → meters, screensaver + wake,
-// attention, fresh-window joy, long-turn wave, and the tap-on-the-meters
-// peek. The lurk trip and idle acts are the corner's own secondary action.
+// attention, fresh-window joy, long-turn wave, the tap-on-the-meters peek,
+// pet mode, and a test run's fanfare or bug hunt (with party.h's confetti
+// and edge glow, which aren't creatures). The lurk trip and idle acts are the corner's own secondary action.
 // Minimal mode collapses all of it to a still Clawd. See
 // docs/clawd-director.md.
 
@@ -34,10 +37,12 @@ void director_alert(const char* message);   // attention hook fired
 void director_alert_clear(void);            // the session moved on
 bool director_take_dismissed(void);         // an alert ended on the device since the last call
 
-// Any touch press at screen x (wired internally to LVGL). On the meters it's
-// tapping the aquarium: the face comes up, curious, for a while (a tap on it
-// sends it back); anywhere else it means "show me the meters".
-void director_tap(int x);
+// Any touch press at screen (x, y) (wired internally to LVGL). On the meters
+// it's tapping the aquarium: the face comes up, curious, for a while (a tap
+// on it sends it back); on the header (ui_header_hit) with live meters it's
+// pet mode, which a tap on the header ends again; anywhere else it means
+// "show me the meters".
+void director_tap(int x, int y);
 // While on, the panel is the pairing control (the touch-hold re-pair on
 // boards without a PWR button): a tap on the meters still counts as you
 // being here and dismisses an alert, but Clawd doesn't peek, so the hint
@@ -66,9 +71,11 @@ DirectorRoom director_room(void);
 const char*  director_beat_name(void);
 
 // QA hook for the `clawd <beat>` serial command: start a beat now so it can
-// be captured with `screenshot` on hardware. beat = show | screensaver |
-// attention | joy | lurk | peek [x] | home. Returns false for an unknown
-// name, or for show / screensaver / lurk / peek while another beat is still
-// running (lurk also needs the full-size sprite, i.e. PSRAM). `peek` is a tap
-// on the meters at x (default: three quarters across).
+// be captured with `screenshot` on hardware. beat = show | screensaver [n] |
+// attention | joy | lurk | peek [x] | pet | pass | fail | confetti | home.
+// Returns false for an unknown name, or for show / screensaver / lurk / peek
+// / pet while another beat is still running (lurk also needs the full-size
+// sprite, i.e. PSRAM). `peek` is a tap on the meters at x (default: three
+// quarters across); `screensaver n` picks its style (0 the face, 1-3 an
+// effect); `pass` / `fail` are a test run's verdict as the app sends it.
 bool director_debug(const char* beat);

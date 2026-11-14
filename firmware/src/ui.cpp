@@ -753,6 +753,17 @@ static void update_view_state(void) {
 
 bool ui_meters_live(void) { return view_state == 2; }
 
+bool ui_header_hit(int x, int y) {
+    (void)x;
+    return y >= 0 && y < L.card[0].y;
+}
+
+int ui_local_hour(void) {
+    if (clock_base_epoch <= 0) return -1;
+    const long secs = clock_base_epoch + (long)((lv_tick_get() - clock_base_ms) / 1000);
+    return (int)((secs / 3600) % 24);
+}
+
 void ui_tick_anim(void) {
     update_view_state();
     if (pair_hint == PAIR_HINT_CLEARED && lv_tick_get() - pair_hint_since >= PAIR_CLEARED_SHOW_MS)

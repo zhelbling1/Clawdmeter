@@ -24,6 +24,7 @@ struct SignalsUpdate {
     bool     replay;          // usage numbers repeat the last poll (rp=1)
     bool     event_fired;     // a hook event the device hasn't reacted to yet
     char     event;           // 'p' prompt, 's' stop, 'b' back after a gap,
+                              // 't' / 'f' tests passed / failed,
                               // or a future char; valid when event_fired
     uint32_t event_seq;       // the `es` that fired
     bool     sessions_changed;// `n` changed (including first sight)
