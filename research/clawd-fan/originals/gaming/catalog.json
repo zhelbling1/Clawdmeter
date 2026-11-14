@@ -37,14 +37,46 @@
     "mood": "active",
     "rows": 37,
     "loop": [
-      11,
-      20
+      8,
+      17
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
-    "references": "Star Fox 64 (1997): the \"Do a barrel roll!\" catchphrase. Generic aviator costume (flying cap, goggles, scarf, bomber jacket); no ships or characters.",
-    "frames": 30,
-    "ms": 5130,
-    "colours": 14,
-    "kb": 38.7
+    "references": "Star Fox 64 (1997): the \"Do a barrel roll!\" catchphrase. He turns into a generic Clawd-shaped starfighter (his own body as the fuselage, legs as engines) and rolls; no ships or characters copied.",
+    "frames": 25,
+    "ms": 4120,
+    "colours": 13,
+    "kb": 39.7
+  },
+  {
+    "file": "Clawd-PortalFall.gif",
+    "name": "portal fall",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      14,
+      21
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Portal (2007): the infinite fall between a blue floor portal and an orange ceiling portal, faster every pass. Generic oval portals; no logos, game UI or cake.",
+    "frames": 33,
+    "ms": 5010,
+    "colours": 11,
+    "kb": 35.8
+  },
+  {
+    "file": "Clawd-HalfLife.gif",
+    "name": "rise and shine",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Half-Life 2 (2004): the silent scientist in an orange-and-grey hazard suit (glasses, goatee, red crowbar) smashing supply crates, watched by a mysterious man in a blue-grey suit with a briefcase. Costumes only: no lambda or other logos, no game UI or sprites.",
+    "frames": 28,
+    "ms": 6600,
+    "colours": 15,
+    "kb": 37.7
   }
 ]
