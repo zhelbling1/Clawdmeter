@@ -23,6 +23,7 @@
 #include "clawd_prefs.h"
 #include "perf.h"
 #include "pair_hold.h"
+#include "pages.h"
 
 #include "hal/board_caps.h"
 #include "hal/display_hal.h"
@@ -260,6 +261,26 @@ static void check_serial_cmd() {
                 theme_format_hex(p, hex);
                 Serial.printf("{\"theme\":\"%s\"}\n", hex);
             }
+            else if (strncmp(cmd_buf, "page ", 5) == 0) {
+                // QA: `page 0` the meters, `page 1` the Clawd page (pages.h).
+                const int n = atoi(cmd_buf + 5);
+                if (n >= 0 && n < PAGE_COUNT) pages_show((Page)n);
+                Serial.printf("{\"page\":%d,\"enabled\":%s}\n", (int)pages_current(),
+                              pages_enabled() ? "true" : "false");
+            }
+            else if (strncmp(cmd_buf, "mood ", 5) == 0) {
+                // QA: the Clawd page's moods, bit 1 angry, bit 2 yelling (0 = the real cues).
+                pages_debug_mood(atoi(cmd_buf + 5));
+                Serial.printf("{\"mood\":%d}\n", atoi(cmd_buf + 5));
+            }
+            else if (strncmp(cmd_buf, "tod ", 4) == 0) {
+                // QA: the Clawd page's minute of day (-1 = the real clock).
+                Serial.printf("{\"tod\":%d}\n", pages_debug_tod(atoi(cmd_buf + 4)));
+            }
+            else if (strncmp(cmd_buf, "work ", 5) == 0) {
+                // QA: Claude working on the Clawd page (0/1, -1 = the real cue).
+                Serial.printf("{\"work\":%d}\n", pages_debug_work(atoi(cmd_buf + 5)));
+            }
             else if (strncmp(cmd_buf, "clawd ", 6) == 0) {
                 const bool ok = director_debug(cmd_buf + 6);
                 Serial.printf("{\"clawd\":\"%s\",\"ok\":%s}\n", cmd_buf + 6, ok ? "true" : "false");
@@ -337,6 +358,7 @@ void setup() {
     ui_update_battery(power_hal_battery_pct(), power_hal_is_charging(), power_hal_is_vbus_in());
     director_init();    // rooms + beats; boots on the meters (home)
     clawd_prefs_init();  // the saved device settings, before the app says otherwise
+    pages_init();        // the Clawd page, where its scene fits the panel
 
     Serial.printf("Dashboard ready (%s, %dx%d) %lu ms after boot, waiting for data on BLE or USB...\n",
         board_caps().name, W, H, (unsigned long)millis());
@@ -427,6 +449,9 @@ struct ButtonRun {
 
 static KeyboardHeld kb_held = {};
 
+// Two PWR presses this close together cycle brightness instead of the page.
+#define PWR_DOUBLE_MS 400
+
 static void kb_send(uint8_t extra_mods, uint8_t extra_key) {
     uint8_t report[8];
     keyboard_report(&kb_held, extra_mods, extra_key, report);
@@ -495,6 +520,7 @@ void loop() {
     performer_tick();
     mascot_tick();
     director_tick();
+    pages_tick();
     if (director_take_dismissed()) {
         ble_send_dismiss();
         if (serial_link_active()) serial_link_send_dismiss();
@@ -560,6 +586,12 @@ void loop() {
             }
         }
 
+        // With the Clawd page (pages.h) and PWR on its default brightness
+        // action, a single press flips between the meters and the Clawd
+        // page and a double press cycles brightness: a press waits
+        // PWR_DOUBLE_MS for a second one. PWR remapped to a key keeps it.
+        static bool     pwr_tap_pending = false;
+        static uint32_t pwr_tap_ms = 0;
         if (power_hal_pwr_pressed()) {
             if (!idle_consume_wake_press()) {
                 // Counts as you being here. On a touchless board whose only
@@ -568,13 +600,28 @@ void loop() {
                 // A board without a PWR button may still report a press (the
                 // T4-S3 makes one from a long BOOT hold): that stays brightness,
                 // as the app offers no PWR field there.
-                if (!director_button(board_caps().button_count == 0)) {
+                if (director_button(board_caps().button_count == 0)) {
+                    pwr_tap_pending = false;
+                } else {
                     ButtonRun pwr_run = {};
                     const int32_t action = board_caps().has_pwr_button ? button_action_get(BTN_SLOT_PWR)
                                                                        : (int32_t)BTN_ACT_BRIGHTNESS;
-                    button_run_press(BTN_SLOT_PWR, &pwr_run, action, false);
+                    const bool brightness = button_action_decode(action).kind == BTN_KIND_BRIGHTNESS;
+                    if (!brightness || !pages_enabled()) {
+                        button_run_press(BTN_SLOT_PWR, &pwr_run, action, false);
+                    } else if (pwr_tap_pending) {
+                        pwr_tap_pending = false;
+                        brightness_cycle();
+                    } else {
+                        pwr_tap_pending = true;
+                        pwr_tap_ms = millis();
+                    }
                 }
             }
+        }
+        if (pwr_tap_pending && millis() - pwr_tap_ms >= PWR_DOUBLE_MS) {
+            pwr_tap_pending = false;
+            pages_next();
         }
 
         pair_tick();
@@ -641,6 +688,7 @@ void loop() {
             if (usage.btn_pwr >= 0)       button_action_set(BTN_SLOT_PWR, usage.btn_pwr);
             if (usage.has_theme) theme_set(usage.theme);
             ui_update(&usage);
+            pages_update(&usage);
             // A prompt (or you're back after a gap): you're at the computer,
             // so a dimmed or dark panel wakes before Clawd notices you. A
             // Stop or tool activity doesn't: Claude working alone isn't you.

@@ -6,6 +6,7 @@
 #include "clawd_anim.h"
 #include "mascot.h"
 #include "performer.h"
+#include "stage.h"
 #include "button_action.h"
 #include "hal/board_caps.h"
 #include <Preferences.h>
@@ -123,5 +124,6 @@ void theme_set(const uint32_t p[TH_COUNT]) {
     clawd_anim_recolor();
     mascot_repaint();
     performer_repaint();
+    stage_repaint();       // the Clawd page, when it's up
     Serial.printf("Theme: %s\n", hex);
 }

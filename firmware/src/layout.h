@@ -82,3 +82,16 @@ int16_t layout_lone_card_y(const Layout& L);
 
 // Pixel width of UTF-8 `text` in `font`, as LVGL draws it (kerning included).
 int32_t layout_text_width(const lv_font_t* font, const char* text);
+
+// The Clawd page's scene (scene.h): its art_w x art_h landscape art (320x172,
+// on a 2 px grid) drawn at the largest half-step scale that fits the glass,
+// scale2 / 2 = 1, 1.5, 2, ... (half steps keep the 2 px grid on whole
+// pixels), centred. A round panel keeps the art's corners inside its circle.
+// Under 1x the details (1 px lines, a 3x5 pixel font) wouldn't survive, so a
+// panel narrower than the art gets no page (`fits` false).
+struct LayoutScene {
+    bool    fits;
+    int16_t scale2;                  // the scale x 2: 2 = 1x, 3 = 1.5x
+    LayoutRect box;                  // where the art lands on the panel
+};
+LayoutScene layout_scene(const LayoutShape& shape, int16_t art_w, int16_t art_h);

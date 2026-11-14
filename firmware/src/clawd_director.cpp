@@ -12,6 +12,7 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // ─── Beats ───────────────────────────────────────────────────────────────────
@@ -29,9 +30,10 @@ enum Beat {
     B_RUN_HOME,      // the performance stops, he runs off, the corner walks home
     B_ATTENTION,     // the big Clawd fetches you
     B_PEEK,          // a tap on the meters: hop, duck out, the face comes up curious for a while
+    B_PAGE,          // the Clawd page has him (pages.h): nothing on the meters moves
 };
 static const char* const BEAT_NAMES[] = {
-    "home", "corner", "show", "screensaver", "face-home", "run-home", "attention", "peek",
+    "home", "corner", "show", "screensaver", "face-home", "run-home", "attention", "peek", "page",
 };
 
 static Beat     beat = B_HOME;
@@ -50,6 +52,11 @@ static AttnFrom attn_from = ATTN_FROM_HOME;   // what it interrupted
 static uint32_t attn_mark = 0;                // last_engagement right after the alert
 static bool     attn_engaged = false;         // you showed up since the alert (sticky across refreshes)
 static bool     resume_screensaver = false;   // decided when attention ends
+static char     alert_message[128] = "";      // the alert's text, for the Clawd page
+
+// The Clawd page (director_page_open)
+static bool     page_exit = false;            // a tap on the page asked for the meters
+static bool     working_now = false;          // clawd_working, as of the last tick
 
 // A notice / wave waiting for him to hurry home from a lurk trip.
 static const char* react_anim = NULL;
@@ -196,9 +203,11 @@ void director_alert(const char* message) {
     attention_since = now_ms();
     attn_anim_done = false;                   // a new alert gets its animation again
     ui_set_alert_text(message);
+    snprintf(alert_message, sizeof(alert_message), "%s", message ? message : "");
     if (attention_on) return;                 // refresh text + timers only
     attention_on = true;
     if (beat == B_ATTENTION) { step = 0; return; }
+    if (beat == B_PAGE) return;               // he yells from the page (stage.h); the meters wait
     // Attention never waits: interrupt whatever is on.
     if (face_visible() || performing) {
         face_set_resting(false);
@@ -248,6 +257,11 @@ void director_tap(int x) {
     engage();
     if (attention_on) { end_attention(ATTN_END_TAP); return; }   // a dismissing tap does nothing else
     resume_screensaver = false;                   // "show me the meters" wins
+    if (beat == B_PAGE) {                         // on the Clawd page: back to the meters
+        page_exit = true;
+        Serial.printf("[%lu] director: tap at x %d -> meters\n", (unsigned long)now_ms(), x);
+        return;
+    }
     if (minimal) return;
     if (beat == B_HOME || beat == B_CORNER) {
         if (pairing_touch) return;                // the hint is the control now
@@ -380,7 +394,9 @@ void director_init(void) {
     if (touch_indev) lv_indev_add_event_cb(touch_indev, indev_cb, LV_EVENT_PRESSED, NULL);
 }
 
-DirectorRoom director_room(void) { return face_visible() ? ROOM_FACE : ROOM_METERS; }
+DirectorRoom director_room(void) {
+    return beat == B_PAGE ? ROOM_PAGE : face_visible() ? ROOM_FACE : ROOM_METERS;
+}
 
 const char* director_beat_name(void) { return BEAT_NAMES[beat]; }
 
@@ -655,12 +671,59 @@ static void run_home(uint32_t now) {
         go(B_SHOW);
 }
 
+// The Clawd page has him. Nothing on the meters moves (no show, screensaver,
+// reaction or peek starts behind the page); an alert only runs its clock, as
+// he yells for you from the page.
+static void run_page(uint32_t now) {
+    if (attention_on && (uint32_t)(now - attention_since) >= clawd_tuning().alert_timeout_ms)
+        end_attention(ATTN_END_TIMEOUT);
+}
+
+bool director_page_open(void) {
+    if (beat == B_PAGE) return true;
+    if (minimal) return false;
+    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PEEK) {
+        engage();
+        resume_screensaver = false;
+        to_meters(false);                     // "show me the meters" first
+        return false;
+    }
+    if (beat != B_HOME && beat != B_CORNER) return false;   // attention, or on the way home
+    engage();
+    react_anim = NULL;                        // a corner reaction is moot now
+    page_exit = false;
+    mascot_place_away();                      // the page covers the meters: he's on it
+    go(B_PAGE);
+    return true;
+}
+
+void director_page_closed(void) {
+    if (beat != B_PAGE) return;
+    page_exit = false;
+    engage();                                 // back on the meters: you're here
+    resume_screensaver = false;
+    arrive_meters();                          // attention if an alert is up, else he walks home
+}
+
+bool director_take_page_exit(void) {
+    const bool e = page_exit;
+    page_exit = false;
+    return e;
+}
+
+bool        director_on_page(void)         { return beat == B_PAGE; }
+bool        director_claude_working(void)  { return working_now; }
+bool        director_alert_active(void)    { return attention_on; }
+const char* director_alert_message(void)   { return alert_message; }
+
 void director_tick(void) {
     const uint32_t now = now_ms();
     const int activity = signals_activity();
     show_gate_update(&show_gate, now, activity, &clawd_tuning());
     // Tool calls flowing (PostToolUse) are hook events too: you're working.
     if (activity > 0) last_engagement = now;
+    working_now = clawd_working(&turn, now, activity);
+    mascot_set_working(working_now);
     face_tick();
 
     switch (beat) {
@@ -672,6 +735,7 @@ void director_tick(void) {
     case B_RUN_HOME:    run_run_home(now); break;
     case B_ATTENTION:   run_attention(now); break;
     case B_PEEK:        run_peek(now); break;
+    case B_PAGE:        run_page(now); break;
     }
 }
 
@@ -682,7 +746,8 @@ bool director_debug(const char* name) {
         engage();
         if (attention_on) { end_attention(ATTN_END_TAP); return true; }
         resume_screensaver = false;
-        if (!minimal) to_meters(false);
+        if (beat == B_PAGE) page_exit = true;   // off the Clawd page
+        else if (!minimal) to_meters(false);
         return true;
     }
     if (strcmp(name, "attention") == 0)   { director_alert("Clawdmeter test alert"); return true; }

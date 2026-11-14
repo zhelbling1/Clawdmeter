@@ -11,6 +11,9 @@
 //           stretch, or a calm dip during the screensaver.
 //   face    the #198 face resting on the glass (face.h): the screensaver,
 //           and the peek when you tap the meters.
+//   page    the Clawd page (pages.h): he's on his own screen, in a scene,
+//           and nothing on the meters moves until it closes (the PWR
+//           button or a tap brings the meters back).
 //
 // Rules of continuity: only ever one Clawd (corner sprite, full-size sprite,
 // performer or face); he enters and leaves through an edge; the screen never
@@ -23,7 +26,7 @@
 // Minimal mode collapses all of it to a still Clawd. See
 // docs/clawd-director.md.
 
-enum DirectorRoom { ROOM_METERS, ROOM_FACE };
+enum DirectorRoom { ROOM_METERS, ROOM_FACE, ROOM_PAGE };
 
 void director_init(void);          // after ui_init()
 void director_tick(void);
@@ -61,6 +64,27 @@ void director_set_attn_anim(int seconds);
 // Print every beat step with a timestamp (the sim turns it on with
 // SIM_TRACE=1 for walkthrough timings). Beat changes always print.
 void director_set_trace(bool on);
+
+// The Clawd page (pages.h) takes Clawd. From the meters (home or a corner
+// act) the corner Clawd is put away at once, since the page covers the
+// meters, and returns true; until director_page_closed() no beat starts and
+// an alert only runs its clock (the page shows him yelling, a tap dismisses
+// it). With the face up or a performance on it's "show me the meters"
+// first and false (press again); during attention, false.
+bool director_page_open(void);
+// The meters are back: he walks back to his seat, or the attention beat
+// takes over if an alert is still up. Counts as you being here.
+void director_page_closed(void);
+// A tap on the page (with no alert up) or `clawd home` asked for the
+// meters since the last call; the page module closes itself.
+bool director_take_page_exit(void);
+bool director_on_page(void);
+// Claude is working (clawd_working: a turn open, or tools running), as of
+// the last director_tick. The corner's laptop act and the page's office.
+bool director_claude_working(void);
+// An alert is up (until a tap, `x` or its timeout) and its message.
+bool        director_alert_active(void);
+const char* director_alert_message(void);
 
 DirectorRoom director_room(void);
 const char*  director_beat_name(void);
