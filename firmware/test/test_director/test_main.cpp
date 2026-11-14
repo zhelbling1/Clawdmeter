@@ -36,10 +36,10 @@ static void run_for(uint32_t ms) {
     }
 }
 
-// Without the full-size sprite nothing performs, so nothing runs home.
-static void assert_every_beat_seen(bool has_big) {
+// Without the performer nothing performs, so nothing runs home.
+static void assert_every_beat_seen(bool has_performer) {
     for (int b = 0; b < BEAT_COUNT; b++)
-        if (has_big || b != B_RUN_HOME) TEST_ASSERT_TRUE_MESSAGE(seen[b], BEAT_NAMES[b]);
+        if (has_performer || b != B_RUN_HOME) TEST_ASSERT_TRUE_MESSAGE(seen[b], BEAT_NAMES[b]);
 }
 
 static void assert_one_clawd(void) {
@@ -74,7 +74,7 @@ static int fuzz_attn_s = CLAWD_ATTN_ANIM_DEFAULT_S;
 
 void setUp(void) {
     broke = false;
-    world = { true, 0, false, true };
+    world = { true, 0, false, true, false, true };
 }
 void tearDown(void) {}
 
@@ -117,9 +117,11 @@ static void fresh_director(void) {
 
 static int fuzz_level = CLAWD_LIVELINESS_DEFAULT;
 
-static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big) {
+// has_performer defaults to has_big (PSRAM, or no full-size Clawd at all).
+static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big, int has_performer = -1) {
     fz = seed;
     world.has_big = has_big;
+    world.has_performer = has_performer < 0 ? has_big : has_performer != 0;
     fresh_director();
     director_set_liveliness(fuzz_level);
     float pct = 10;
@@ -178,6 +180,24 @@ static void test_fuzz_one_clawd_without_full_size_sprite(void) {
     assert_every_beat_seen(false);
 }
 
+// No PSRAM, direct_performer: the performer's grid and the full-size
+// sprite's are allocated separately, so one can be there without the other.
+// Shows then play full size with a seated attention wave, or as corner acts
+// with the big attention walk-on and lurk trips; still one Clawd.
+static void test_fuzz_one_clawd_with_performer_but_no_full_size_sprite(void) {
+    memset(seen, 0, sizeof(seen));
+    for (uint32_t seed = 1; seed <= 15 && !broke; seed++) fuzz(seed * 31337u, 30 * 60 * 1000, false, 1);
+    assert_every_beat_seen(true);
+    assert_one_clawd();
+}
+
+static void test_fuzz_one_clawd_with_full_size_sprite_but_no_performer(void) {
+    memset(seen, 0, sizeof(seen));
+    for (uint32_t seed = 1; seed <= 15 && !broke; seed++) fuzz(seed * 65537u, 30 * 60 * 1000, true, 0);
+    assert_every_beat_seen(false);
+    assert_one_clawd();
+}
+
 // No-nonsense: everything that isn't a tap or an alert leaves him sitting
 // still in his seat: busy stretches, prompts, stops, usage moving, a fresh
 // window, a long quiet.
@@ -232,7 +252,7 @@ static void test_fuzz_one_clawd_at_every_liveliness(void) {
 // app hears about it) but he never points or waves; he sits in his seat,
 // including when the alert cut a show short and he had to come back.
 static void attention_off(bool has_big) {
-    world.has_big = has_big;
+    world.has_big = world.has_performer = has_big;
     fuzz_attn_s = 0;
     fresh_director();
     world.activity = 3;
@@ -259,7 +279,7 @@ static void attention_off(bool has_big) {
 // tells the app) instead of doing its normal job; with nothing to dismiss, or
 // with a touchscreen, the press is left to its normal role.
 static void test_boot_dismisses_alert_without_touch(void) {
-    world.has_big = true;
+    world.has_big = world.has_performer = true;
     world.has_touch = false;
     fresh_director();
     TEST_ASSERT_FALSE_MESSAGE(director_button(true), "nothing to dismiss");
@@ -278,7 +298,7 @@ static void test_boot_dismisses_alert_without_touch(void) {
 }
 
 static void test_boot_leaves_alert_alone_with_touch(void) {
-    world.has_big = true;
+    world.has_big = world.has_performer = true;
     world.has_touch = true;
     fresh_director();
     director_alert("needs you");
@@ -294,7 +314,7 @@ static void test_attention_animation_off_without_full_size_sprite(void) { attent
 // points and waves, then goes back to his seat while the alert stays up
 // until its own timeout.
 static void attention_short(bool has_big) {
-    world.has_big = has_big;
+    world.has_big = world.has_performer = has_big;
     fuzz_attn_s = 10;
     fresh_director();
     director_alert("needs you");
@@ -339,6 +359,8 @@ int main(int, char**) {
     RUN_TEST(test_screensaver_calm_dip_keeps_one_clawd);
     RUN_TEST(test_fuzz_one_clawd_with_full_size_sprite);
     RUN_TEST(test_fuzz_one_clawd_without_full_size_sprite);
+    RUN_TEST(test_fuzz_one_clawd_with_performer_but_no_full_size_sprite);
+    RUN_TEST(test_fuzz_one_clawd_with_full_size_sprite_but_no_performer);
     RUN_TEST(test_no_nonsense_sits_still_through_everything_but_taps);
     RUN_TEST(test_no_nonsense_ends_a_running_show);
     RUN_TEST(test_fuzz_one_clawd_at_every_liveliness);

@@ -15,7 +15,8 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/clawd_director.{h,cpp}` | Owns the rooms and runs the beats. It is the only module that decides what Clawd does next. |
 | `firmware/src/clawd_policy.{h,cpp}` | Pure decision rules, unit-tested in `test/test_clawd_policy`: show gate and show group, screensaver gate, where attention returns to, how long a reaction waits for him, the corner seat's headroom, turn tracker, no-repeat picker, jitter, the resting face's rhythm, what a tap on the meters earns (the peek, how he sets off), where the face looks and how long it stays curious, and all tunables (`ClawdTuning`). |
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
-| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM only. |
+| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. An LVGL image with PSRAM; drawn straight to the panel on boards with `direct_performer` (see "Boards without PSRAM"). |
+| `firmware/src/direct_sprite.{h,cpp}` | A full-size Clawd drawn straight to the panel without a screen-sized buffer, for `direct_performer` boards: the performer, the lurk trip and the attention walk-on use it there. Its diff and blit sizing are pure and unit-tested in `test/test_direct_sprite`. Ported from [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter). |
 | `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver and the held peek. |
 | `firmware/src/face_motion.{h,cpp}` | The face's rise and drop as a pure function of time (vertical only, one size: overshoot and settle, anticipation, follow-through; see "The face's motion"), unit-tested in `test/test_face_motion`. |
 | `firmware/src/field.{h,cpp}` | A flat-colour shape on an overlay layer (a rectangle plus two small extra rectangles) that redraws only the strips that change colour (see "Redraw cost and frame rate"). The face is a field. |
@@ -91,14 +92,14 @@ passed. Beat changes always print; every step prints too after
 
 | Beat | Trigger | Steps |
 |---|---|---|
-| `home` | default | Corner autonomy on: jittered idle gaps (±40 % of 10 / 7 / 5 / 3.5 s by mood), mood-picked acts, never the same act twice running, and lurk trips (PSRAM). Also checks the gates below. |
+| `home` | default | Corner autonomy on: jittered idle gaps (±40 % of 10 / 7 / 5 / 3.5 s by mood), mood-picked acts, never the same act twice running, and lurk trips (PSRAM or `direct_performer`). Also checks the gates below. |
 | `corner` | notice, wave, joy, or after a transition | Waits for the commanded corner act or walk to finish, then `home`. |
-| `show` | `a == 3` held for 5 min; at most one per 15 min; hooks seen; meters live | Points at the bar (or, if he's out on a lurk trip, heads straight out), walks off left at 1.5×, walks back on full size at 1.5×, one scene (loop held 16 s, so about 20 s), waves, walks off left, and the corner Clawd walks back in to his seat. Without the performer (no PSRAM): points, then dances twice (jumps for joy twice when usage is Heavy) and waves, all in his seat. |
+| `show` | `a == 3` held for 5 min; at most one per 15 min; hooks seen; meters live | Points at the bar (or, if he's out on a lurk trip, heads straight out), walks off left at 1.5×, walks back on full size at 1.5×, one scene (loop held 16 s, so about 20 s), waves, walks off left, and the corner Clawd walks back in to his seat. Without the performer (no PSRAM and no `direct_performer`): points, then dances twice (jumps for joy twice when usage is Heavy) and waves, all in his seat. |
 | `screensaver` | 10 min with no engagement; needs hooks seen or a window that hasn't started (spend-capped and `week` accounts have no window, so they need hooks); meters live | Walks off through the nearest edge (a lurk trip finishes its peek first), face rises and rests (blinks every 2–6 s, about one in five a double, glances where the far eye travels 1.5×). Every 3–5 min, a calm dip: the face drops onto the meters, he walks on, plays one calm scene (magnifier or walking, alternating) and walks off, then the face rises and he rests again. Without the performer the corner Clawd walks back to his seat, sits for the scene's length and walks off again. |
 | `face-home` | tap, prompt, button or attention while the screensaver face is up; a tap, attention or the end of its curiosity while the peek face is up | If woken by a prompt or tapped during a peek, he blinks first (noticing), then the face drops into the meters, and the corner hurries home at 1.5×. |
 | `run-home` | tap or attention during a performance; a tap, prompt, button or usage moving during a calm dip | The scene releases to the idle pose on the spot, holds 200 ms, and he runs off left, ramping from 1.5× to 3× over 400 ms. Once he's gone, the corner walks home at 1.5×. |
 | `peek` | any tap on the meters (`home` or `corner`), live or stale (below) | Seated: a startled hop (`jumping` from its crouch, 2×), then he ducks out through the nearest edge at 4×; already moving or out: straight out at 4×. The face rises, eyes glance toward the tap's x and hold 1.6–2.4 s, a blink (30 % double), the look comes back to you, and the face stays up, curious, for 5 min: resting like the screensaver face (blinks every 2–6 s, some double), its glances going back toward the tap most of the time. Then it goes back on its own; a tap sends it back right away (with the acknowledging blink). Both go through `face-home`: the drop, and he walks back to his seat at 1.5×. (below: what else happens while it's up) |
-| `attention` | `m` (alert) in a payload | The corner walks off at 2×, the big Clawd (12 px cells) walks on at 2×, then waves and points alternately (no PSRAM: he waves and points in his seat). The alert lasts until a tap, `x` (clear) or 2 min; his animation lasts the **attention animation** time (below), 2 min by default, after which the big one walks off left and the corner Clawd sits in his seat while the alert stays up. Off: no animation, he sits in his seat. A new alert animates again. Interrupts a show or the screensaver through `face-home` / `run-home`, and then returns to where it left off (below). |
+| `attention` | `m` (alert) in a payload | The corner walks off at 2×, the big Clawd (12 px cells) walks on at 2×, then waves and points alternately (no full-size sprite: he waves and points in his seat). The alert lasts until a tap, `x` (clear) or 2 min; his animation lasts the **attention animation** time (below), 2 min by default, after which the big one walks off left and the corner Clawd sits in his seat while the alert stays up. Off: no animation, he sits in his seat. A new alert animates again. Interrupts a show or the screensaver through `face-home` / `run-home`, and then returns to where it left off (below). |
 
 **Which scene a show plays.** The trigger (activity 3) lifts the live mood
 group to Heavy, so the show reads the usage-only base group instead, floored
@@ -347,12 +348,57 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
 - Corner Clawd: animated. Its buffer, sized for the largest corner act
   (jumping happy, 28×30 cells × 3 px, about 23 KB), falls back to internal RAM.
 - Face: plain LVGL objects, the same as on S3.
-- No performer (its buffer is about 690 KB): a show is corner acts (pointing,
-  dancing or jumping happy twice, a wave) and a calm dip is the corner Clawd
-  walking back to his seat for a while (see Beats).
-- No full-size sprite (about 250 KB), so there's no lurk trip, and attention
-  is a wave and point in his seat (he walks back to it first if he's out),
-  for the attention animation's time.
+- Performer and full-size sprite: no room for their LVGL images (about
+  690 KB and 250 KB). With the `direct_performer` capability (only the
+  AMOLED-2.16 C6, `waveshare_amoled_216_c6`, where it was checked on
+  hardware) all three full-size Clawds, the performer, the lurk trip and the
+  attention walk-on, are drawn straight to the panel instead
+  (`direct_sprite.{h,cpp}`, ported from
+  [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter)), still in
+  front of the meters. Shows, calm dips, lurk trips and attention then look
+  as they do on S3:
+  - Each sprite owns a cell grid on the panel (the performer's 60×60 grid of
+    8 px cells; the attention Clawd's 12 px and the lurk's 8 px cells, each a
+    panel-wide band as tall as its tallest frame, feet on its bottom row). A
+    frame commits as a diff against what's on the panel: only coloured cells
+    that are new or changed are written, row by row, with
+    `display_hal_draw_bitmap`; the cells he leaves are handed back to LVGL
+    (`lv_obj_invalidate_area`), which redraws the meters there.
+  - Every area LVGL renders gets his coloured cells written into it before it
+    goes to the panel (`performer_overlay` and `mascot_overlay`, called from
+    `my_flush_cb`), so the meters' own redraws, the cells handed back and a
+    rotation's full redraw never show through him. (Painting him back after
+    the band was sent let LVGL's merged redraws flash the meters through him
+    in strips on the big scenes.)
+  - A new `th` palette recolours the frames' palettes in place, so
+    `performer_repaint` / `mascot_repaint` mark the grids
+    (`direct_sprite_recolour`) and the next commit repaints every cell.
+  - Internal RAM: the performer's grid reuses its existing static cell
+    arrays (no new allocation); the attention and lurk grids are 40×21 and
+    60×17 cells, two bytes each (about 3.6 KB); the three share one blit
+    buffer of at most one 480 px row of 8 px cells (7.5 KB; a row of 12 px
+    cells goes out in two writes), since only one Clawd is ever on screen.
+    About 11 KB of heap in all, allocated at `ui_init`, before the chime
+    takes its buffer.
+  - New full-size work needs nothing special: performer scenes (any name in
+    `GROUP_NAMES` / `CALM_NAMES`, `performer_perform`,
+    `performer_perform_group`) and the mascot's full-size modes go through
+    `render_cells` / `draw_big` / `draw_lurk`, which pick the image or the
+    direct sprite. Gate full-size beats on `performer_available()` (or the
+    mascot's own `big_ok()`), never on PSRAM. A new full-size mascot
+    animation goes in `mascot.cpp`'s `BIG` list, which sizes both the PSRAM
+    image and the direct grid's height. Anything else that would draw a
+    full-size Clawd needs its own `DirectSprite` and an overlay call in
+    `my_flush_cb`.
+  - The direct writes need even-aligned areas on the CO5300, so cells must be
+    even there: 8 and 12 px on a 480 panel are, the 368×448 C6's 9 px
+    attention cells aren't. The code is otherwise panel-agnostic (it goes
+    through the display HAL), but it's enabled only where it was checked.
+- Without the capability (the other no-PSRAM boards) a show is corner acts
+  (pointing, dancing or jumping happy twice, a wave), a calm dip is the
+  corner Clawd walking back to his seat for a while (see Beats), there's no
+  lurk trip, and attention is a wave and point in his seat (he walks back to
+  it first if he's out), for the attention animation's time.
 
 ## Buttons
 
@@ -423,7 +469,10 @@ at Off / 10 s / 30 s (`test_director`). In the sim:
 - Native: `pio test -d firmware -e native -f test_clawd_policy` (the rules)
   and `-f test_director` (the director against timed stand-ins for its
   actors: one Clawd on screen at every tick of a seeded fuzz, every beat
-  reached, and nothing left hanging once the input stops).
+  reached, and nothing left hanging once the input stops; also with only
+  one of the performer and the full-size sprite, as a `direct_performer`
+  board has when only one of their grids could be allocated), and
+  `-f test_direct_sprite` (the direct path's diff and blit sizing).
 - Sim: `SIM_FAST=1 SIM_SCENARIO=sim/director.jsonl`, plus `SIM_SHOTS` /
   `SIM_TAPS` for headless capture (see `docs/simulator.md`) and `SIM_TRACE=1` for
   the per-step trace. The interruptions (lurk cut short, attention resuming
@@ -492,7 +541,8 @@ On hardware that read as choppy.
   restacking a full-screen object would invalidate the whole screen even
   when it draws nothing, so those run with
   `lv_display_enable_invalidation(false)` around them (`field_quietly`).
-- **The performer** (PSRAM boards) repaints only the cells that changed and
+- **The performer** (PSRAM boards; the direct path does the same, see
+  "Boards without PSRAM") repaints only the cells that changed and
   invalidates their bounding box, instead of the whole screen-sized image
   every frame, and is hidden (quietly, the same way) whenever he's off
   screen. A show in the sim averages about 18 k px/frame (7.7 % of the

@@ -1,6 +1,7 @@
 #include "performer.h"
 #include "clawd_anim.h"
 #include "clawd_policy.h"
+#include "direct_sprite.h"
 #include "field.h"
 #include "perf.h"
 #include "splash_geometry.h"
@@ -24,7 +25,15 @@ static int       dim = GRID * 8;               // the buffer is dim x dim px
 static lv_obj_t* img = NULL;
 static uint8_t*  buf = NULL;                   // planar RGB565A8: colour plane, then alpha
 static lv_image_dsc_t dsc;
-static bool      shown = false;                // img not hidden
+static bool      shown = false;                // img not hidden (direct: he's on the panel)
+
+// Direct mode, for boards without PSRAM (direct_performer): no screen-sized
+// buffer. He's drawn straight to the panel, in front of the meters, on the
+// same 60x60 grid (direct_sprite.h). Ported from Faith012/Clawdmeter.
+static bool         direct = false;
+static DirectSprite ds;
+
+static bool ready(void) { return img || direct; }
 
 // ─── Mood groups ─────────────────────────────────────────────────────────────
 #define GROUP_COUNT 4
@@ -114,7 +123,23 @@ static void set_hidden(void* on) {
     else    lv_obj_clear_flag(img, LV_OBJ_FLAG_HIDDEN);
 }
 
+// Direct mode: the grid is the frame; only what changed reaches the panel.
+// The grid's buffers are stage_cells (what compose() returns) and
+// drawn_cells, which the image path would use, so it costs no extra RAM.
+static void render_direct(const uint8_t* cells, const uint16_t* palette) {
+    if (cells != ds.next) memcpy(ds.next, cells, (size_t)GRID * GRID);
+    direct_sprite_commit(&ds, palette);
+    cells_any = ds.any;
+    if (cells_any && !shown) { shown = true; perf_begin(PERF_PERFORM); }
+    if (!cells_any && shown) { shown = false; perf_end(PERF_PERFORM); }
+}
+
+void performer_overlay(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint16_t* px) {
+    if (direct) direct_sprite_overlay(&ds, x1, y1, x2, y2, px);
+}
+
 static void render_cells(const uint8_t* cells, const uint16_t* palette) {
+    if (direct) { render_direct(cells, palette); return; }
     if (!buf || !img) return;
     bool any = false;
     for (int i = 0; i < GRID * GRID; i++) if (cells[i]) { any = true; break; }
@@ -284,10 +309,25 @@ void performer_init(lv_obj_t* parent, int feet_y) {
     cell = geo.cell;
     dim = geo.canvas_dim;
     const size_t bytes = (size_t)dim * dim * 3;
-    // PSRAM only: without it there's no room for a screen-sized sprite, and
-    // the director plays performances as corner acts.
+    int x0, x1;
+    panel_row_span(c.width, c.height, c.round_panel, feet_y, &x0, &x1);
+    // Without PSRAM there's no room for a screen-sized sprite: boards with
+    // direct_performer draw him straight to the panel (direct_sprite.h); the
+    // rest, or if even that can't be set up, get performances as corner acts.
     buf = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
-    if (!buf) { Serial.println("performer: no PSRAM, corner acts only"); return; }
+    if (!buf) {
+        const int org_x = ((c.width - dim) / 2) & ~1;   // even, as the panels' flush areas are
+        const int org_y = (feet_y - (ANCHOR_Y + CLAWD_ART_H) * cell) & ~1;
+        direct = c.direct_performer &&
+                 direct_sprite_init(&ds, cell, org_x, org_y, GRID, GRID, drawn_cells, stage_cells);
+        Serial.printf("performer: no PSRAM, %s\n", direct ? "drawing direct" : "corner acts only");
+        if (!direct) return;
+        span_to_cells(org_x, cell, GRID, x0, x1, &stage_c0, &stage_c1);
+        shown = false;
+        pst = P_OFF;
+        dx = offstage_dx(-1);
+        return;
+    }
     memset(buf, 0, bytes);
     memset(drawn_cells, 0, sizeof(drawn_cells));
 
@@ -304,8 +344,6 @@ void performer_init(lv_obj_t* parent, int feet_y) {
     // His feet (art row 37) on the floor; centred across. The grid may hang
     // past the bottom edge; nothing is drawn there.
     lv_obj_set_pos(img, (c.width - dim) / 2, feet_y - (ANCHOR_Y + CLAWD_ART_H) * cell);
-    int x0, x1;
-    panel_row_span(c.width, c.height, c.round_panel, feet_y, &x0, &x1);
     span_to_cells((c.width - dim) / 2, cell, GRID, x0, x1, &stage_c0, &stage_c1);
     lv_obj_add_flag(img, LV_OBJ_FLAG_HIDDEN);
     shown = false;
@@ -313,7 +351,7 @@ void performer_init(lv_obj_t* parent, int feet_y) {
     dx = offstage_dx(-1);
 }
 
-bool performer_available(void) { return img != NULL; }
+bool performer_available(void) { return ready(); }
 
 // ─── Performer API ───────────────────────────────────────────────────────────
 void performer_place_offstage(int side) {
@@ -325,20 +363,20 @@ void performer_place_offstage(int side) {
 }
 
 void performer_walk_home(uint16_t spd) {
-    if (!stand_anim || !img) return;
+    if (!stand_anim || !ready()) return;
     if (dx == 0) { stand(); return; }
     pst = P_WALK;
     walk_start(stand_anim, GAIT_WALK, 0, spd);
 }
 
 void performer_walk_off(int side, uint16_t spd) {
-    if (!stand_anim || !img) return;
+    if (!stand_anim || !ready()) return;
     pst = P_WALK;
     walk_start(stand_anim, GAIT_WALK, offstage_dx(side), spd);
 }
 
 void performer_run_off(int side, uint16_t from_pct, uint16_t to_pct, uint32_t ramp) {
-    if (!stand_anim || !img) return;
+    if (!stand_anim || !ready()) return;
     pst = P_WALK;
     walk_start(stand_anim, GAIT_WALK, offstage_dx(side), from_pct);
     ramp_from = from_pct;
@@ -347,7 +385,7 @@ void performer_run_off(int side, uint16_t from_pct, uint16_t to_pct, uint32_t ra
 }
 
 void performer_perform(int idx, uint32_t loop_ms) {
-    if (!img) return;
+    if (!ready()) return;
     scene_start(clawd_anim_at(idx), loop_ms);
 }
 
@@ -355,7 +393,7 @@ static ClawdRng rng;
 static bool rng_seeded = false;
 
 void performer_perform_group(int group, uint32_t loop_ms, bool calm) {
-    if (!img) return;
+    if (!ready()) return;
     if (!rng_seeded) { clawd_rng_seed(&rng, millis() ^ 0x57A6E); rng_seeded = true; }
     if (group < 0 || group >= GROUP_COUNT) group = 0;
     const char* const* names = calm ? CALM_NAMES : GROUP_NAMES[group];
@@ -379,6 +417,7 @@ bool performer_visible(void) { return cells_any; }
 
 void performer_repaint(void) {
     drawn_palette = NULL;   // every cell repaints in the recoloured palette
+    if (direct) direct_sprite_recolour(&ds);
     redraw();
 }
 
@@ -431,7 +470,7 @@ static void choreo_tick(uint32_t now) {
 }
 
 void performer_tick(void) {
-    if (!img || clawd_anim_count() == 0) return;
+    if (!ready() || clawd_anim_count() == 0) return;
     const uint32_t now = millis();
     switch (pst) {
     case P_WALK:

@@ -14,6 +14,10 @@ static const BoardCaps caps = {
     .minimal_ui   = false,   // full animated UI; true for e-ink / slow panels
     .has_pwr_button = true,  // AXP2101 PKEY
     .has_touch = true,
+    // No PSRAM: full-size shows, lurk trips and the attention walk-on are
+    // drawn straight to the panel (direct_sprite.h). Checked on this board
+    // by Faith012/Clawdmeter, where the path comes from.
+    .direct_performer = true,
 };
 
 const BoardCaps& board_caps(void) { return caps; }

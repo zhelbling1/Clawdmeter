@@ -37,6 +37,12 @@ struct BoardCaps {
                              // (director_button).
     bool    mono_panel;      // a 1-bit panel (e-paper): it keeps the default
                              // palette and ignores `th` (clawd_prefs.cpp).
+    bool    direct_performer; // without PSRAM, draw the full-size Clawds
+                             // (performer, lurk trip, attention walk-on)
+                             // straight to the panel (direct_sprite.h)
+                             // instead of falling back to corner acts.
+                             // Ignored with PSRAM. Set it only once the board
+                             // has been checked on hardware.
 };
 
 const BoardCaps& board_caps(void);
