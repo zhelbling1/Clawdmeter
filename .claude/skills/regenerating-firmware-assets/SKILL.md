@@ -49,14 +49,19 @@ node tools/convert_official_clawd.js                  # regenerate the header
 node tools/convert_official_clawd.js --verify DIR     # + per-animation PNGs to eyeball
 ```
 
-Needs ImageMagick. Sources are the official assets in
-`research/clawd-official/` (Laptop and Soccer from their Lottie exports, the
-rest from GIFs). What the converter does (55×37 stage crops, ≤16-colour
+Uses ImageMagick for GIFs when installed, else the built-in
+`tools/gif_decode.js` (same output, byte-identical for the official set).
+Sources are the official assets in `research/clawd-official/` (Laptop and
+Soccer from their Lottie exports, the rest from GIFs) plus the fan-made ones in
+`research/clawd-fan/` (category `fan`; GIFs and TB1982's JSON grids). What the converter does (55×37 stage crops, ≤16-colour
 palettes, loop detection, synthesized eyes, contrast recolors) is in
 [tools/README.md](../../../tools/README.md); asset provenance and format
 facts are in `research/clawd-official/CLAUDE.md`. Rebuild the firmware
 afterwards and check the new or changed animation in the simulator.
 
-Clawd sprites come only from the official art: don't draw or retouch sprite
-frames by hand. To find new official animations, use the
+Clawd sprites come from the official art and the credited fan-made art in
+`research/clawd-fan/`: don't draw or retouch sprite frames by hand. A new
+animation also needs a group in `performer.cpp` (`GROUP_NAMES`, and
+`CALM_NAMES` for calm dips); a corner act must sit on the seated Clawd's left
+edge (ox 15) within the buffer `CORNER_ANIMS` in `mascot.cpp` sizes. To find new official animations, use the
 `hunting-clawd-animations` skill.

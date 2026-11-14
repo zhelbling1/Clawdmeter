@@ -28,16 +28,25 @@ static bool      shown = false;                // img not hidden
 
 // ─── Mood groups ─────────────────────────────────────────────────────────────
 #define GROUP_COUNT 4
-#define GROUP_MAX   4
+#define GROUP_MAX   8
+// Names in the first four slots of each group are the official scenes; the
+// rest are the Book (official, unlisted) and the fan-made ones in
+// research/clawd-fan/ (rizowski's baking/eating, TB1982's drawings).
 static const char* const GROUP_NAMES[GROUP_COUNT][GROUP_MAX] = {
-    { "magnifier", "walking", "pointing", "lurking" },        // idle / sleepy
-    { "crab walking", "waving", "trumpet", "basketball" },    // normal pace
-    { "laptop", "dancing", "skateboard", "soccer" },          // active
-    { "racing car", "cloud", "sailing scene", "jumping happy" }, // heavy burn
+    { "magnifier", "walking", "pointing", "lurking",          // idle / sleepy
+      "book", "eating", "idle blossom", "idle hearts" },
+    { "crab walking", "waving", "trumpet", "basketball",      // normal pace
+      "fm listening", "swim summer", "space", NULL },
+    { "laptop", "dancing", "skateboard", "soccer",            // active
+      "work out", "surfing", "hanabi", "jumping blossom" },
+    { "racing car", "cloud", "sailing scene", "jumping happy", // heavy burn
+      "baking", "this is fine", NULL, NULL },
 };
 // The screensaver's calm dips: gentle Idle-group scenes only (lurking is a
 // corner act and pointing is his "noticing" gesture).
-static const char* const CALM_NAMES[] = { "magnifier", "walking" };
+static const char* const CALM_NAMES[] = {
+    "magnifier", "walking", "book", "eating", "idle blossom", "idle hearts",
+};
 
 // ─── Performer ───────────────────────────────────────────────────────────────
 enum PerfState { P_OFF, P_STAND, P_WALK, P_SCENE, P_CHOREO };

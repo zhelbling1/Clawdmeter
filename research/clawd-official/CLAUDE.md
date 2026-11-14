@@ -1,7 +1,7 @@
 # Official Clawd animations
 
-This folder archives Anthropic's official Clawd animations, the only source
-of Clawd sprite art on the device. `README.md` is the inventory (files,
+This folder archives Anthropic's official Clawd animations. Fan-made art
+the device also plays is kept apart in `../clawd-fan/`; never put it here. `README.md` is the inventory (files,
 frames, timing, where each is used). `fetch.sh` re-downloads everything and
 probes for new names. To find new animations, use the
 `hunting-clawd-animations` skill; to convert them, the
@@ -39,7 +39,7 @@ Verified frame-level findings (RMSE comparisons, bbox trims):
     Jumping, JumpingHappy, Pointing, Waving, sailing-loop (`7bbe5052`).
   - **Scenes** (idle → prop assembles → loopable middle → prop packs away →
     idle): RacingCar, both sailing files, Cloud-once, Magnifier, Trumpet,
-    Basketball, Skateboard, Soccer.
+    Basketball, Skateboard, Soccer, Book.
   - **Empty-stage**: Lurking. Frames 0 and 66 are an empty canvas: he peeks
     in from the edge and leaves. Walk Clawd off-screen first, play Lurking,
     then walk him back in.

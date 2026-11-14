@@ -63,4 +63,7 @@ New animation:
 - [ ] Shown in the simulator at 480×480 and 240×240 (verifying-firmware-ui skill)
 ```
 
-Only official art goes on the device; never draw or retouch Clawd frames.
+Official finds go in `research/clawd-official/`. Fan-made art (this fork only)
+goes in `research/clawd-fan/` with its author, fork URL and licence status
+recorded in that README; never mix it into the official folder, and never
+draw or retouch Clawd frames yourself.
