@@ -21,15 +21,15 @@
     "mood": "active",
     "rows": 37,
     "loop": [
-      11,
-      18
+      12,
+      15
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
     "references": "The chopper getaway from Pulp Fiction (1994): slicked-back hair, leather jacket, a raked chopper with ape-hanger bars, and the line \"Zed's dead\" as a two-word caption.",
     "frames": 27,
-    "ms": 5220,
+    "ms": 5820,
     "colours": 13,
-    "kb": 40.3
+    "kb": 39
   },
   {
     "file": "Clawd-BulletTime.gif",
@@ -37,15 +37,15 @@
     "mood": "active",
     "rows": 37,
     "loop": [
-      11,
-      14
+      10,
+      15
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
-    "references": "The slow-motion bullet dodge from The Matrix (1999): tiny black shades, long black coat, falling green code, bullets crawling past with ripples in the air.",
-    "frames": 24,
-    "ms": 5580,
-    "colours": 12,
-    "kb": 36.6
+    "references": "The slow-motion bullet dodge from The Matrix (1999): tiny black shades, long black coat, the bend-back dodge, falling green code, bullets crawling past with ripples in the air.",
+    "frames": 25,
+    "ms": 5540,
+    "colours": 11,
+    "kb": 38.8
   },
   {
     "file": "Clawd-LavaThumbs.gif",
@@ -69,15 +69,15 @@
     "mood": "heavy",
     "rows": 37,
     "loop": [
-      10,
-      13
+      8,
+      15
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
     "references": "The desert drive from Fear and Loathing in Las Vegas (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats and the two-word caption \"bat country\".",
-    "frames": 21,
-    "ms": 4410,
+    "frames": 22,
+    "ms": 5720,
     "colours": 16,
-    "kb": 38
+    "kb": 39.4
   },
   {
     "file": "Clawd-SaberDuel.gif",

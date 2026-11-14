@@ -28,6 +28,89 @@ function layer(g, draw, map = (x, y, c) => c) {
 // Keep only columns x0..x1 (a tighter frame keeps the converted size down).
 const clipX = (x0, x1) => (x, y, c) => (x >= x0 && x <= x1 ? c : null);
 
+// ── Derived poses ────────────────────────────────────────────────────────────
+
+// Lean back (the slow-motion dodge): the official idle pose rearranged as
+// whole rows and blocks, nothing redrawn. The head block (rows above the
+// chin) stays rigid and slides back by `lean`; the torso rows step from
+// there to `knees` at the waist, a parallelogram shear; the legs slant
+// forward from the planted feet to `knees` at the hip; `drop` bends the
+// knees (body down, top leg rows hidden, as the official crouches do);
+// `squash` takes out that many of the identical plain torso rows so the
+// lean lies flatter; the arm nubs stay rigid 4×4 blocks hung off the
+// shoulder row's ends (top-aligned with it), offset by armL / armR [dx, dy]. Registered as a synthetic clip,
+// so place() / clawd() and the anchors work on it. Extra anchors: torso
+// { y: [x0, x1] } per torso row, and arms { L: [[x, y]], R: [...] }.
+const LEAN_CLIP = 'm1lean';
+k.data.clips[LEAN_CLIP] = k.data.clips[LEAN_CLIP] || { file: '(derived in movies/props_m1.js)', frames: [] };
+const leanMade = new Map();
+function leanBack(id, { lean = -8, knees = 2, drop = 1, squash = 0, armL = [0, 0], armR = [0, 0] } = {}) {
+  if (leanMade.has(id)) return leanMade.get(id);
+  const P = k.pose('idle'), a = P.anchors;
+  const [hx0, hx1] = [a.head.x0, a.head.x1];
+  const torsoRows = [];                                   // body rows under the head, top to bottom
+  for (let y = a.chin; y <= a.waist; y++) torsoRows.push(y);
+  // Plain torso rows (no arms on them) can be taken out to squash the lean.
+  const armRow = (y) => P.cells.some(([x, yy]) => yy === y && (x < hx0 || x > hx1));
+  const plain = torsoRows.filter(y => !armRow(y));
+  const cut = new Set(plain.slice(0, squash));
+  const kept = torsoRows.filter(y => !cut.has(y));
+  const n = kept.length;
+  // New row and shift for every body row; i counts up from the waist.
+  const newY = new Map(), shift = new Map();
+  kept.slice().reverse().forEach((y, i) => {
+    newY.set(y, a.waist + drop - i);
+    shift.set(y, Math.round(knees + (lean - knees) * (i + 1) / (n + 1)));
+  });
+  const headDy = newY.get(kept[0]) - kept[0];             // head moves with the top torso row
+  const cells = [], arms = { L: [], R: [] }, torso = {};
+  const shoulder = kept[0];
+  for (const [x, y, t] of P.cells) {
+    if (y < a.chin) { cells.push([x + lean, y + headDy, t]); continue; }
+    if (y >= a.legTop) {
+      if (y < a.legTop + drop) continue;                  // hidden by the knee bend
+      const s = Math.round(knees * (a.feet - y) / (a.feet - a.legTop + 1));
+      cells.push([x + s, y, t]); continue;
+    }
+    if (cut.has(y)) continue;
+    const isL = x < hx0, isR = x > hx1;
+    if (isL || isR) {                                     // arm nub: a rigid block hung off the
+      const [mx, my] = isL ? armL : armR;                 // shoulder row's edge (top-aligned)
+      const c = [x + shift.get(shoulder) + mx, y - shoulder + newY.get(shoulder) + my, t];
+      cells.push(c); arms[isL ? 'L' : 'R'].push([c[0], c[1]]);
+      continue;
+    }
+    cells.push([x + shift.get(y), newY.get(y), t]);
+  }
+  for (const y of kept) torso[newY.get(y)] = [hx0 + shift.get(y), hx1 + shift.get(y)];
+  // Rasterise: body over arms where they overlap, eyes always on top.
+  const at = new Map();
+  for (const [x, y, t] of cells) {
+    const kk = x + ',' + y, old = at.get(kk);
+    if (old === 'e') continue;
+    if (t === 'e' || !old || (old === 's' && t === 'o')) at.set(kk, t);
+  }
+  const xs = [...at.keys()].map(q => +q.split(',')[0]), ys = [...at.keys()].map(q => +q.split(',')[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const rows = [];
+  for (let y = y0; y <= y1; y++) { let r = ''; for (let x = x0; x <= x1; x++) r += at.get(x + ',' + y) || '.'; rows.push(r); }
+  const num = 2000 + leanMade.size;
+  k.data.clips[LEAN_CLIP].frames.push({ src: [num], ms: 100, x: x0, y: y0, rows });
+  const name = `${LEAN_CLIP}:${num}`;
+  const an = k.frame(LEAN_CLIP, num).anchors;
+  const tys = Object.keys(torso).map(Number);
+  an.chin = Math.min(...tys); an.waist = Math.max(...tys); an.legTop = an.waist + 1;
+  an.head = { ...an.head, x0: hx0 + lean, x1: hx1 + lean, cx: a.head.cx + lean, top: a.head.top + headDy };
+  an.torso = torso; an.arms = arms;
+  for (const sd of ['L', 'R']) {
+    const ax = arms[sd].map(c => c[0]), ay = arms[sd].map(c => c[1]);
+    const hy0 = Math.min(...ay), hy1 = Math.max(...ay);
+    an['hand' + sd] = { x: sd === 'L' ? Math.min(...ax) : Math.max(...ax), y: Math.round((hy0 + hy1) / 2), y0: hy0, y1: hy1, dir: sd === 'L' ? -1 : 1 };
+  }
+  leanMade.set(id, name);
+  return name;
+}
+
 // ── Costume pieces ───────────────────────────────────────────────────────────
 
 // Tiny oval shades: one dark lens over each eye (a cell wider on the outer
@@ -57,6 +140,64 @@ function openCoat(g, P, { c = C.charcoal, lapel = C.slate, long = 3 } = {}) {
     rect(g, x0 - (i === long ? 1 : 0), y, mc - 1, y, c);
     rect(g, mc + 2, y, x1 + (i === long ? 1 : 0), y, c);
   }
+}
+
+// Long black coat, cut away so his orange shows: sleeves to the wrist (the
+// outer column of each arm nub stays orange, his hands), narrow front
+// panels down each side of the torso with slate lapels at the top, the
+// middle left open, and two tails to the ankles.
+function coatSleeves(g, P, c) {
+  const [hx0, hx1] = k.headSpan(P);
+  const sets = (P.anchors && P.anchors.arms) || (() => {
+    const L = [], R = [];
+    for (const [x, y] of P.cells) if (y >= P.chin && y <= P.waist) { if (x < hx0) L.push([x, y]); else if (x > hx1) R.push([x, y]); }
+    return { L, R };
+  })();
+  for (const [cells, side] of [[sets.L, -1], [sets.R, 1]]) {
+    if (!cells.length) continue;
+    const hand = side < 0 ? Math.min(...cells.map(q => q[0])) : Math.max(...cells.map(q => q[0]));
+    for (const [x, y] of cells) if (x !== hand) k.onBody(g, P, x, y, c);
+  }
+}
+function trimCoat(g, P, { c = C.charcoal, lapel = C.slate, panel = 3 } = {}) {
+  const [hx0, hx1] = k.headSpan(P);
+  coatSleeves(g, P, c);
+  for (let y = P.chin; y <= P.waist; y++) {
+    const w = y === P.chin ? panel + 1 : panel;
+    for (let x = hx0; x < hx0 + w; x++) k.onBody(g, P, x, y, c);
+    for (let x = hx1 - w + 1; x <= hx1; x++) k.onBody(g, P, x, y, c);
+    if (y - P.chin >= 1 && y - P.chin <= 2) { k.onBody(g, P, hx0 + w, y, lapel); k.onBody(g, P, hx1 - w, y, lapel); }
+  }
+  for (let y = P.waist + 1; y <= Math.min(35, P.feet - 1); y++) {
+    rect(g, hx0, y, hx0 + panel, y, c);
+    rect(g, hx1 - panel, y, hx1, y, c);
+  }
+}
+// The same coat on a leanBack() pose: the front has fallen open (his whole
+// chest shows), sleeves stay on, and the coat hangs from his back to the floor behind him. drape(g, P) goes UNDER
+// the pose; leanCoat(g, P) over it. flutter 0..2 ripples the hem.
+function drape(g, P, { c = C.charcoal, edge = C.slate, flutter = 0 } = {}) {
+  const tys = Object.keys(P.anchors.torso).map(Number).sort((u, v) => u - v);
+  const [wa] = P.anchors.torso[tys[tys.length - 1]];          // waist row's back edge
+  const xs = P.cells.map(q => q[0]);
+  const xl = Math.min(...P.cells.filter(q => q[1] <= P.chin + 1).map(q => q[0])) + 1;
+  const top = (x) => Math.min(...P.cells.filter(q => q[0] === x).map(q => q[1]).concat([99]));
+  for (let x = xl; x <= wa + 3; x++) {
+    const t = top(x);
+    if (t > 35) continue;
+    const back = (wa + 3 - x) / Math.max(1, wa + 3 - xl);   // 1 at the far back, 0 at the hips
+    const hem = 35 - Math.round(back * 2) - ((x + flutter) % 3 === 0 ? 1 : 0);
+    for (let y = t; y <= hem; y++) put(g, x, y, c);
+    put(g, x, hem, (x + flutter) % 3 === 1 ? edge : c);
+  }
+  return xs;
+}
+function leanCoat(g, P, { c = C.charcoal, lapel = C.slate } = {}) {
+  coatSleeves(g, P, c);
+  // Lapels: the open front's edges, a cell each side of the shoulder row.
+  const tys = Object.keys(P.anchors.torso).map(Number).sort((u, v) => u - v);
+  const [a, b] = P.anchors.torso[tys[0]];
+  k.onBody(g, P, a, tys[0], lapel); k.onBody(g, P, b, tys[0], lapel);
 }
 
 // Aviators with tinted glass: the eyes stay visible through amber lenses,
@@ -159,11 +300,13 @@ function wheel(g, cx, cy, r, { tire = C.charcoal, rim = C.slate, hub = C.steel, 
  * Chopper, facing right. (bx, by) shifts it; parts split so the rider sits
  * between them: chopperBack() before Clawd, chopperFront() after. The rider
  * is the 'point' pose at { dx: bx, dy: by - 4 }: seat under him, ape-hanger
- * grips at his hand (x 42+bx, y 20+by).
+ * grips at his hand (x 42+bx, y 20+by). wy (default by) sets the wheels'
+ * own drop, so the frame can bob on its suspension while the tyres stay on
+ * the road.
  */
-function chopperBack(g, bx = 0, by = 0, { spin = 0 } = {}) {
+function chopperBack(g, bx = 0, by = 0, { spin = 0, wy = by } = {}) {
   const X = (x) => x + bx, Y = (y) => y + by;
-  wheel(g, X(12), Y(32), 4.4, { spin, rim: C.slate });       // fat rear tyre
+  wheel(g, X(12), 32 + wy, 4.4, { spin, rim: C.slate });     // fat rear tyre
   // Rear fender and sissy bar.
   line(g, X(7), Y(29), X(10), Y(27), C.red); rect(g, X(10), Y(27), X(15), Y(27), C.red);
   rect(g, X(9), Y(21), X(10), Y(28), C.steel);
@@ -174,7 +317,7 @@ function chopperBack(g, bx = 0, by = 0, { spin = 0 } = {}) {
   line(g, X(17), Y(34), X(5), Y(28), C.slate);
   rect(g, X(17), Y(34), X(28), Y(34), C.slate);
 }
-function chopperFront(g, bx = 0, by = 0, { spin = 0 } = {}) {
+function chopperFront(g, bx = 0, by = 0, { spin = 0, wy = by } = {}) {
   const X = (x) => x + bx, Y = (y) => y + by;
   // Seat and frame rail.
   rect(g, X(14), Y(29), X(31), Y(30), C.charcoal);
@@ -197,7 +340,7 @@ function chopperFront(g, bx = 0, by = 0, { spin = 0 } = {}) {
   rect(g, X(42), Y(19), X(42), Y(19), C.charcoal);            // grip
   put(g, X(45), Y(24), C.glow); put(g, X(46), Y(24), C.glow);  // headlight
   rect(g, X(44), Y(23), X(46), Y(23), C.steel);
-  wheel(g, X(49), Y(33), 3.4, { spin, rim: C.slate });
+  wheel(g, X(49), 33 + wy, 3.4, { spin, rim: C.slate });
 }
 
 /**
@@ -279,15 +422,16 @@ function carFront(g, bx = 0, by = 0, { spin = 0 } = {}) {
 }
 
 // The desert rolling by: tan floor from the horizon down, mesas on the
-// horizon and pebbles drifting left with t.
-function desert(g, t, { horizon = 29 } = {}) {
+// horizon and pebbles drifting left with t. mesaT (default t) moves the
+// mesas on their own clock; pebbles: false leaves the floor bare.
+function desert(g, t, { horizon = 29, mesaT = t, pebbles = true } = {}) {
   rect(g, 2, horizon, 52, 36, C.tan);
   const mesas = [[2, 5, 6], [24, 7, 4], [42, 4, 7]];
   for (const [x, w, h] of mesas) {
-    let mx = ((x - t) % 56 + 56) % 56 - 2;
+    let mx = ((x - mesaT) % 56 + 56) % 56 - 2;
     for (let i = 0; i < h; i++) rect(g, Math.max(2, mx - i), horizon - 1 - (h - 1 - i), Math.min(52, mx + w + i), horizon - 1 - (h - 1 - i), C.brown);
   }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < (pebbles ? 9 : 0); i++) {
     const px = ((i * 13 + 7 - t * 4) % 52 + 52) % 52 + 1, py = horizon + 1 + (i * 5) % 7;
     put(g, px, py, C.brown);
   }
@@ -393,8 +537,8 @@ function moon(g, cx, cy, r, { c = C.cream, crater = [0xD6, 0xCC, 0xA4], rim = nu
 }
 
 module.exports = {
-  layer, clipX,
-  tinyShades, openCoat, tintedAviators, hood, hoodie, hawaiian, cigHolder, thumbsUp,
+  layer, clipX, leanBack,
+  tinyShades, openCoat, trimCoat, drape, leanCoat, tintedAviators, hood, hoodie, hawaiian, cigHolder, thumbsUp,
   wheel, spokeWheel, chopperBack, chopperFront, bikeBack, bikeFront, carBack, carFront, desert,
   exhaust, bat, codeRain, bullet, lavaPool, lavaSurface, lavaBubble, moon,
 };
