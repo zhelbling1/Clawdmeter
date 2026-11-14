@@ -7,8 +7,10 @@
 
 #define SERIAL_LINK_BUF 512   // the BLE RX buffer's size: the app caps payloads at 500 B
 
+// One buffer: main.cpp takes a payload and parses it in the same loop pass,
+// before check_serial_cmd() can feed the next line (the classic ESP32
+// boards have no static RAM to spare for a second copy).
 static char     pending[SERIAL_LINK_BUF];
-static char     taken[SERIAL_LINK_BUF];
 static bool     have_pending = false;
 static bool     ever_received = false;
 static uint32_t last_rx_ms = 0;
@@ -40,9 +42,8 @@ bool serial_link_has_data(void) {
 }
 
 const char* serial_link_get_data(void) {
-    memcpy(taken, pending, sizeof(taken));
     have_pending = false;
-    return taken;
+    return pending;
 }
 
 bool serial_link_active(void) {

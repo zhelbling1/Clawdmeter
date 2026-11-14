@@ -22,7 +22,8 @@ void serial_link_overflow(void);
 // `ping`: the app is there (keeps the link up while it has nothing to send).
 void serial_link_ping(void);
 bool serial_link_has_data(void);
-// The latest payload, copied for the caller; valid until the next call.
+// The latest payload; valid until the next serial_link_feed() (the next
+// loop pass's check_serial_cmd), so parse it right away.
 const char* serial_link_get_data(void);
 // A payload arrived within SERIAL_LINK_FRESH_MS.
 bool serial_link_active(void);

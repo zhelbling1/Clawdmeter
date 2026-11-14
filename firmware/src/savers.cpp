@@ -45,11 +45,16 @@ static const uint16_t FRAME_MS[SAVER_COUNT] = { 80, 80, 80 };
 struct Star { float x, y, z; uint8_t tint; };
 struct RainStream { int16_t col, len; float head, speed; char ch[MAXLEN][2]; };
 struct Dot { float x, y, vx, vy; uint8_t blue; };
-static union {
+union FxState {
     Star       stars[NSTAR];
     RainStream st[NSTREAM];
     Dot        dots[NDOT];
-} fx;
+};
+// From the heap only while an effect runs (saver_start / saver_stop): the
+// classic ESP32 boards have no static RAM to spare for ~1.4 KB that sits
+// unused outside the screensaver.
+static FxState* fx_state = NULL;
+#define fx (*fx_state)
 
 // ---------------------------------------------------------------- starfield
 static void star_respawn(Star& s, bool anywhere) {
@@ -278,6 +283,8 @@ void saver_init(void) {
 
 void saver_start(int kind) {
     if (!obj || kind < 0 || kind >= SAVER_COUNT) return;
+    if (!fx_state) fx_state = (FxState*)malloc(sizeof(FxState));
+    if (!fx_state) return;                       // no room: the face carries on alone
     rng_s ^= micros() | 1;
     kind_cur = kind;
     switch (kind) {
@@ -296,6 +303,8 @@ void saver_stop(void) {
     if (!obj || kind_cur < 0) return;
     kind_cur = -1;
     lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);     // hiding repaints what was under it
+    free(fx_state);                               // drawn no more: hidden, and every
+    fx_state = NULL;                              // step/draw checks kind_cur first
 }
 
 bool saver_active(void) { return kind_cur >= 0; }
