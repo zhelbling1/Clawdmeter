@@ -10,8 +10,12 @@ struct FakeWorld {
     bool meters_live;
     int  activity;
     bool asleep;
-    bool has_big;          // PSRAM boards: the performer, lurk trips, the attention walk-on
+    bool has_big;          // the full-size sprite: lurk trips, the attention walk-on
     bool has_touch;        // BoardCaps.has_touch
+    bool has_performer;    // full-size shows and calm dips (performer_available)
+    // With PSRAM both full-size actors are there; without it they're there
+    // only on direct_performer boards, each on its own internal-RAM grid
+    // (direct_sprite.h), so one can be set up and the other not.
 };
 extern FakeWorld world;
 

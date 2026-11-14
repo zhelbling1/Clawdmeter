@@ -13,11 +13,17 @@
 // gaps, mood-picked acts (never the same twice running) and the lurk trip.
 //
 // The corner sprite works on every board (its ~23 KB buffer falls back to
-// internal RAM); the full-size sprite needs PSRAM (~250 KB). Without it the
-// lurk trip is skipped and attention is a wave and point from his seat.
+// internal RAM). The full-size sprite is an LVGL image with PSRAM (~250 KB);
+// without it, boards with direct_performer draw it straight to the panel
+// (direct_sprite.h), and the rest skip the lurk trip and wave and point from
+// the seat for attention.
 
 lv_obj_t* mascot_create(lv_obj_t *parent, int slot_x, int feet_y, int cell);
 void mascot_tick(void);
+// The flush callback calls this with each area LVGL rendered, before it goes
+// to the panel, so a directly drawn full-size Clawd is written into it. A
+// no-op otherwise.
+void mascot_overlay(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint16_t* px);
 
 bool mascot_seated(void);            // in his seat, between acts
 bool mascot_away(void);              // fully off screen
@@ -41,7 +47,7 @@ void mascot_return(int from_side, uint16_t speed_pct); // -1 left / +1 right edg
 // speed up a walk home. True when he's home or on his way; false while the
 // attention Clawd owns him.
 bool mascot_hurry_home(void);
-bool mascot_lurk(void);              // QA: start a lurk trip now (seated, PSRAM only)
+bool mascot_lurk(void);              // QA: start a lurk trip now (seated, with a full-size sprite)
 void mascot_place_away(void);        // off screen now (a curtain is covering)
 void mascot_reset(void);             // seated now, nothing pending
 

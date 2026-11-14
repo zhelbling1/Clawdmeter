@@ -19,7 +19,7 @@
 uint32_t   fake_now_ms = 1000;
 bool       fake_serial_echo = false;
 FakeSerial Serial;
-FakeWorld  world = { true, 0, false, true, true };
+FakeWorld  world = { true, 0, false, true, true, true };
 
 // The only BoardCaps field the director reads.
 const BoardCaps& board_caps(void) {
@@ -186,7 +186,7 @@ static PState   p_state = P_OFF;
 static uint32_t p_until = 0;
 
 void performer_init(lv_obj_t*, int) {}
-bool performer_available(void) { return world.has_big; }
+bool performer_available(void) { return world.has_performer; }
 void performer_place_offstage(int) { p_state = P_OFF; }
 void performer_walk_home(uint16_t spd) {
     if (p_state != P_OFF) { p_state = P_STAND; return; }

@@ -88,3 +88,18 @@ static inline void span_to_cells(int grid_x, int cell, int grid_cells,
     *c0 = a;
     *c1 = b;
 }
+
+// The cells of that grid that the pixel span [x0, x1) touches at all,
+// clamped to [0, grid_cells]: what a directly drawn sprite (direct_sprite.h)
+// has to write into an area LVGL just rendered.
+static inline void span_touch_cells(int grid_x, int cell, int grid_cells,
+                                    int x0, int x1, int* c0, int* c1) {
+    int a = x0 - grid_x, b = x1 - grid_x;
+    a = a < 0 ? 0 : a / cell;
+    b = b <= 0 ? 0 : (b + cell - 1) / cell;
+    if (a > grid_cells) a = grid_cells;
+    if (b > grid_cells) b = grid_cells;
+    if (b < a) b = a;
+    *c0 = a;
+    *c1 = b;
+}

@@ -17,14 +17,25 @@
 // walking, or performing a scene. Scenes always end on the idle pose, so the
 // next thing starts from the same spot.
 //
-// Needs PSRAM for its full-screen RGB565A8 buffer (about 690 KB on a 480
-// panel). Without it performer_available() is false and the director plays
-// performances as corner acts instead.
+// With PSRAM he's an LVGL image over the meters (a full-screen RGB565A8
+// buffer, about 690 KB on a 480 panel). Without it, on boards with the
+// direct_performer capability, he's drawn straight to the panel in front of
+// the meters (direct_sprite.h). Otherwise performer_available() is false and
+// the director plays performances as corner acts instead.
+//
+// New scenes need nothing special for the direct path: everything goes
+// through compose() and render_cells(), which pick the image or the direct
+// sprite. Check performer_available() (never PSRAM) before planning a
+// full-size beat.
 
 // feet_y: the screen row his feet stand on at home (the floor he performs on).
 void performer_init(lv_obj_t *parent, int feet_y);
 void performer_tick(void);
 bool performer_available(void);
+// The flush callback calls this with each area LVGL rendered, before it goes
+// to the panel, so a directly drawn performer is written into it. A no-op
+// otherwise.
+void performer_overlay(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint16_t* px);
 
 enum PerformerSide { PERFORMER_LEFT = -1, PERFORMER_RIGHT = +1 };
 
