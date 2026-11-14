@@ -241,6 +241,14 @@ public:
         }
     }
 
+    // A peer subscribed over an encrypted link (who send() reaches).
+    bool any() const {
+        for (uint16_t h : handles) {
+            if (h != CONN_HANDLE_NONE && server->getPeerInfoByHandle(h).isEncrypted()) return true;
+        }
+        return false;
+    }
+
     // False if a subscribed peer didn't take it (no buffer free), to retry.
     bool send(NimBLECharacteristic* chr, const uint8_t* report, size_t len) const {
         bool ok = true;
@@ -670,4 +678,12 @@ void ble_consumer_press(uint16_t usage) {
 
 void ble_consumer_release(void) {
     ble_consumer_press(0);
+}
+
+bool ble_hid_keyboard_ready(void) {
+    return state == BLE_STATE_CONNECTED && input_kbd && kbd_subscribers.any();
+}
+
+bool ble_hid_consumer_ready(void) {
+    return state == BLE_STATE_CONNECTED && input_consumer && consumer_subscribers.any();
 }

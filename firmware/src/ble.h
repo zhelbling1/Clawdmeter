@@ -28,6 +28,10 @@ void ble_set_battery_level(int pct);
 
 // BLE HID keyboard: a whole report: [modifiers, 0, key1..key6]
 void ble_keyboard_report(const uint8_t report[8]);
+// A host is connected and subscribed (encrypted) to the keyboard / consumer
+// report, so the report reaches it (key_route.h sends over USB otherwise).
+bool ble_hid_keyboard_ready(void);
+bool ble_hid_consumer_ready(void);
 // BLE HID consumer control (media keys): one usage down, then 0 = released
 void ble_consumer_press(uint16_t usage);
 void ble_consumer_release(void);

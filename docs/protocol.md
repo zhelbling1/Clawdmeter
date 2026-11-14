@@ -57,8 +57,8 @@ seconds) and sends `x` if the device still shows it.
 
 The board can take the same payloads over its USB serial port (115200 baud,
 the port the `info`, `clawd` and `theme` serial commands use). It is an
-alternative to Bluetooth for data. Buttons still send key presses over
-Bluetooth only.
+alternative to Bluetooth for data, and it carries the buttons' key presses
+when no Bluetooth host takes them (see **Keys**).
 
 - **Framing.** Any line that starts with `{` is a payload: the same JSON
   object the app writes to RX, one per line, at most 500 bytes. The app sends
@@ -83,6 +83,24 @@ Bluetooth only.
   no data to send (stale data, logged out, before the first good poll). While
   the link is up the board shows itself as connected even if Bluetooth isn't;
   the meters go stale if the data does.
+- **Keys.** Board → app, one line per change, written whole in one go:
+  `{"kb":"MMK1K2K3K4K5K6"}` is the HID keyboard report in 14 hex digits (the
+  modifier byte, Ctrl/Shift/Alt/GUI left in bits 0–3 and right in 4–7, then
+  six key usages; the boot report's reserved byte is left out). It is the
+  whole keyboard state: `00000000000000` means every key is up. While
+  anything is held the board sends the same report again every second.
+  `{"cc":<usage>}` is a media key down (a HID consumer usage in decimal,
+  e.g. `{"cc":205}` Play/Pause), `{"cc":0}` its release. **Bluetooth
+  first, never both:** a report goes over BLE HID if a host is connected
+  and subscribed (over an encrypted link) to that report, as before;
+  otherwise over USB if the link is up (`serial_link_active()`); otherwise
+  nowhere. A report sent while keys are held follows the press that started
+  it, so a key that went down on one link comes up on the same one
+  (`firmware/src/key_route.cpp`). The app types them on this computer
+  (Windows only so far, `SendInput`; `desktop/crates/clawdmeter-app/src/keys.rs`):
+  it diffs successive reports into key-down/up events, repeats a held key at
+  the system's typematic rate, and lets go of everything if the link closes
+  or no update comes for 3 seconds with keys held.
 - **Detection.** The `info` reply carries `"usb":1` when the firmware has the
   link, for example
   `{"env":"...","ver":"...","rev":"...","link":"ble","usb":1,"mac":"AA:BB:CC:DD:EE:FF"}`.

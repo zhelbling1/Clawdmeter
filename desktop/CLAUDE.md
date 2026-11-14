@@ -52,13 +52,20 @@ is faked behind `FlashHardware`.
   `same_board`, `parse_line`, `frame` (`\n{json}\n`). `FirmwareInfo.usb` is
   the `"usb"` flag of the `info` reply (serde default 0); `FirmwareInfo.mac`
   its `"mac"` (the board's BLE address, uppercase; serde default empty).
+  The board's buttons come up the link as `LinkEvent::Keyboard`
+  (`{"kb":…}`) and `LinkEvent::Consumer` (`{"cc":…}`) when no BLE host takes
+  them; `SerialLink::forward_keys` sends those straight from the link thread
+  to a key sink, and an all-up report when the link ends.
 - `clawdmeter-app`: the `clawdmeter` binary. Tray (`tray/`, ksni on Linux),
   window (`ui/`), `daemon.rs` (drives the engine on its own thread: 0.5 s
   tick, config re-read every 5 s and on `Command::ReloadSettings`),
   `hooks/` (`clawdmeter hook alert|clear|event` and the settings.json
   installer), `ipc.rs` (single-instance lock, status file, command queues,
   window lock), `onboarding.rs`, `boards.rs` (names, buy links,
-  illustrations), `chime.rs`.
+  illustrations), `chime.rs`, `keys.rs` (types the board's USB key events:
+  `KeyState` is the pure report diff, typematic repeat and 3 s stuck-key
+  guard; `KeyInjector` runs it on its own thread, `SendInput` on Windows
+  with VK + scan codes, a log-once stub elsewhere; tests never inject).
 
 ## Running
 
