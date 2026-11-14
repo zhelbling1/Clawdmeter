@@ -299,6 +299,19 @@ impl Engine {
     /// A (re)connection: resend everything the device needs.
     pub fn on_connected(&mut self) {
         self.attention.reset();
+        self.resend_all(false);
+    }
+
+    /// The same device on another link (USB <-> BLE), or one that may have
+    /// missed a write: resend every setting and the numbers, keeping the alert
+    /// state (unlike [`Engine::on_connected`], which starts it over). `lost`:
+    /// the device may not have what was sent (it restarted, rejected a
+    /// payload, or the link died with writes queued), so an alert that is up
+    /// goes out again.
+    pub fn resend_all(&mut self, lost: bool) {
+        if lost {
+            self.attention.resend();
+        }
         self.sent_a = None;
         self.sent_n = None;
         self.sent_lv = None;

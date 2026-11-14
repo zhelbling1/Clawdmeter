@@ -5,6 +5,7 @@
 //! event loop never shares a reactor with it. The UI talks to it through a
 //! [`DaemonHandle`]: commands in, a [`Status`] snapshot out.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
@@ -20,6 +21,7 @@ use clawdmeter_core::platform::AppearanceWatch;
 use clawdmeter_core::probe;
 use clawdmeter_core::usage;
 use clawdmeter_core::{unix_now, Engine, EngineStatus, HostClock, Paths, Settings, WriteKind};
+use clawdmeter_flash::link::{self as usb_link, LinkEvent, PortProbe, SerialLink};
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 
@@ -29,6 +31,102 @@ const TICK: Duration = Duration::from_millis(500);
 const SETTINGS_EVERY: i64 = 5;
 /// Connection check interval (s).
 const LINK_CHECK_EVERY: i64 = 5;
+/// How often to look for a board on USB while there's no USB link (s).
+const USB_SCAN_EVERY: i64 = 10;
+/// How long each USB port gets to answer `info` during a scan.
+const USB_PROBE: Duration = Duration::from_millis(1500);
+/// Device name shown while the data goes over USB.
+const USB_NAME: &str = "Clawdmeter (USB)";
+
+/// The USB serial link is on unless `CLAWDMETER_USB=0`.
+fn usb_enabled() -> bool {
+    std::env::var("CLAWDMETER_USB").map_or(true, |v| v.trim() != "0")
+}
+
+/// Don't ask a port again for this long (s) after its firmware answered
+/// without the USB link, or it is another board than the paired one.
+const USB_RETRY_NO_LINK: i64 = 300;
+/// The same after no answer at all, or a port that couldn't be opened (s):
+/// short, since a board that was just plugged in is often still booting.
+const USB_RETRY_SILENT: i64 = 20;
+
+/// What one USB scan found.
+struct UsbScan {
+    /// The opened link, if a board took it.
+    link: Option<SerialLink>,
+    /// Ports asked and turned down, with when to ask them again.
+    retry: Vec<(String, i64)>,
+}
+
+/// One scan (blocking): ask each Espressif port that isn't waiting out a
+/// retry, and open the first board whose firmware has the USB link and is the
+/// paired one (`paired`: the cached BLE address; `None` = any). While it
+/// probes, `usb-held` says so, so a window that wants the port waits; a
+/// window claim stops the scan.
+fn scan_usb(paths: Paths, skip: HashMap<String, i64>, paired: Option<String>, now: i64) -> UsbScan {
+    let held = crate::ipc::usb_held_file(&paths);
+    let _ = std::fs::write(&held, "scanning");
+    let mut found = UsbScan { link: None, retry: Vec::new() };
+    for p in clawdmeter_flash::device::list_ports() {
+        if skip.get(&p.path).is_some_and(|&t| t > now) {
+            continue;
+        }
+        if crate::ipc::usb_claimed(&paths, unix_now()) {
+            break;
+        }
+        match usb_link::probe_port(&p.path, USB_PROBE) {
+            PortProbe::Usb(info) if !usb_link::same_board(&info, paired.as_deref()) => {
+                log::info!(
+                    "USB {}: board {} isn't the paired one ({}); leaving it to Bluetooth",
+                    p.path,
+                    info.mac,
+                    paired.as_deref().unwrap_or("?")
+                );
+                found.retry.push((p.path, now + USB_RETRY_NO_LINK));
+            }
+            PortProbe::Usb(info) => {
+                if crate::ipc::usb_claimed(&paths, unix_now()) {
+                    break;
+                }
+                match SerialLink::open(&p.path, Some(held.clone())) {
+                    Ok(l) => {
+                        log::info!("USB link on {} ({} firmware {})", p.path, info.env, info.ver);
+                        found.link = Some(l);
+                        break;
+                    }
+                    Err(e) => {
+                        log::info!("USB link on {}: {e}", p.path);
+                        found.retry.push((p.path, now + USB_RETRY_SILENT));
+                    }
+                }
+            }
+            PortProbe::NoUsb(info) => {
+                log::info!(
+                    "USB {}: {} firmware {} has no USB data link (update the firmware to use it)",
+                    p.path,
+                    info.env,
+                    info.ver
+                );
+                found.retry.push((p.path, now + USB_RETRY_NO_LINK));
+            }
+            PortProbe::Silent => found.retry.push((p.path, now + USB_RETRY_SILENT)),
+            PortProbe::Failed(e) => {
+                log::debug!("USB {}: {e}", p.path);
+                found.retry.push((p.path, now + USB_RETRY_SILENT));
+            }
+        }
+    }
+    // An open link keeps `usb-held` (the port's name) until it closes.
+    if found.link.is_none() {
+        let _ = std::fs::remove_file(&held);
+    }
+    found
+}
+
+/// Close a USB link off the runtime thread (joining waits up to one poll).
+fn close_usb(l: SerialLink) {
+    tokio::task::spawn_blocking(move || l.close());
+}
 
 /// Requests from the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,6 +299,19 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
     let mut last_link_check = unix_now();
     let mut last_write_at = None;
     let mut chimes_muted = false;
+    // The USB serial link (clawdmeter_flash::link): while it's open every
+    // write goes over USB; BLE stays up beside it for the buttons.
+    let usb_on = usb_enabled();
+    let mut usb: Option<SerialLink> = None;
+    let mut usb_scan: Option<JoinHandle<UsbScan>> = None;
+    let mut last_usb_scan = i64::MIN / 2;
+    // Ports turned down by a scan, and when to ask them again.
+    let mut usb_retry: HashMap<String, i64> = HashMap::new();
+    // A held marker left by a crashed run would make the window wait.
+    let _ = std::fs::remove_file(crate::ipc::usb_held_file(&paths));
+    if !usb_on {
+        log::info!("USB link off (CLAWDMETER_USB=0)");
+    }
     let mut ticker = tokio::time::interval(TICK);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -244,6 +355,9 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                 Ok(Command::Shutdown) | Err(mpsc::error::TryRecvError::Disconnected) => {
                     if let Some(l) = link.take() {
                         l.close().await;
+                    }
+                    if let Some(u) = usb.take() {
+                        u.close();
                     }
                     log::info!("daemon stopped");
                     return;
@@ -335,8 +449,13 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                     link = Some(l);
                     device_events = Some(rx);
                     reconnect.connected();
-                    inbox.reset();
-                    engine.on_connected();
+                    // While USB carries the data, BLE is only the buttons:
+                    // the device's state (alert included) is unchanged, so
+                    // there is nothing to start over or resend.
+                    if usb.is_none() {
+                        inbox.reset();
+                        engine.on_connected();
+                    }
                 }
                 Ok(Err(e)) => {
                     link_state = match &e {
@@ -389,8 +508,67 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
             }
         }
 
+        // ---- USB link ----
+        // Handing the board between links keeps the alert state
+        // (`resend_all`); only a real BLE reconnect starts it over.
+        let claimed = crate::ipc::usb_claimed(&paths, now);
+        if claimed {
+            // The window may be flashing: ask every port afresh afterwards.
+            usb_retry.clear();
+        }
+        if let Some(u) = usb.take() {
+            if !u.is_alive() || claimed {
+                if claimed {
+                    log::info!("USB {}: the window or a command needs the port; letting it go", u.port());
+                } else {
+                    log::info!("USB {}: link lost", u.port());
+                }
+                close_usb(u);
+                // Back on BLE (if it's up). A dead link may have taken queued
+                // writes with it, so a shown alert goes out again too.
+                engine.resend_all(!claimed);
+            } else {
+                while let Some(ev) = u.try_event() {
+                    match ev {
+                        LinkEvent::Dismissed => {
+                            log::info!("attention alert dismissed on the device (USB)");
+                            engine.on_device_dismissed();
+                        }
+                        LinkEvent::Rebooted => {
+                            log::info!("USB {}: the board restarted; sending everything again", u.port());
+                            engine.resend_all(true);
+                            engine.request_refresh(now);
+                        }
+                        LinkEvent::Rejected => engine.resend_all(true),
+                    }
+                }
+                usb = Some(u);
+            }
+        }
+        if usb_scan.as_ref().is_some_and(JoinHandle::is_finished) {
+            if let Ok(scan) = usb_scan.take().expect("checked").await {
+                usb_retry.extend(scan.retry);
+                if let Some(u) = scan.link {
+                    if crate::ipc::usb_claimed(&paths, unix_now()) {
+                        close_usb(u);
+                    } else {
+                        usb = Some(u);
+                        // The board may have restarted while nobody held its
+                        // port (a flash, a replug), with its `{"ready":true}`
+                        // unheard: a shown alert goes out again (silently).
+                        engine.resend_all(true);
+                    }
+                }
+            }
+        }
+        if usb_on && usb.is_none() && usb_scan.is_none() && !claimed && now - last_usb_scan >= USB_SCAN_EVERY {
+            last_usb_scan = now;
+            let (p, skip, paired) = (paths.clone(), usb_retry.clone(), cache.load());
+            usb_scan = Some(tokio::task::spawn_blocking(move || scan_usb(p, skip, paired, now)));
+        }
+
         // ---- write ----
-        if let Some(l) = &link {
+        if usb.is_some() || link.is_some() {
             if let Some(w) = engine
                 .next_write(now, HostClock { utc_offset_secs: clawdmeter_core::platform::utc_offset_secs(), ..host })
             {
@@ -402,31 +580,44 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                     WriteKind::Event => "Event",
                     WriteKind::NoData => "No data",
                 };
-                log::info!("{label}: {}", String::from_utf8_lossy(&bytes));
-                match l.write(&bytes).await {
-                    Ok(()) => {
-                        engine.mark_written(now, &w);
-                        last_write_at = Some(now);
+                let via = if usb.is_some() { " (USB)" } else { "" };
+                log::info!("{label}{via}: {}", String::from_utf8_lossy(&bytes));
+                if let Some(u) = &usb {
+                    match u.write(&bytes) {
+                        Ok(()) => {
+                            engine.mark_written(now, &w);
+                            last_write_at = Some(now);
+                        }
+                        // The next tick sees the dead link and falls back to BLE.
+                        Err(e) => log::warn!("USB write failed: {e}"),
                     }
-                    Err(e) => {
-                        log::warn!("write failed: {e}");
-                        if !l.is_connected().await {
-                            link = None;
-                            device_events = None;
-                            link_state = LinkState::Searching;
-                            reconnect.retry_in(now, 2);
+                } else if let Some(l) = &link {
+                    match l.write(&bytes).await {
+                        Ok(()) => {
+                            engine.mark_written(now, &w);
+                            last_write_at = Some(now);
+                        }
+                        Err(e) => {
+                            log::warn!("write failed: {e}");
+                            if !l.is_connected().await {
+                                link = None;
+                                device_events = None;
+                                link_state = LinkState::Searching;
+                                reconnect.retry_in(now, 2);
+                            }
                         }
                     }
                 }
             }
         }
 
-        let _ = status.send(Status {
-            link: link_state.clone(),
-            engine: engine.status(now),
-            last_write_at,
-            claude: claude.clone(),
-        });
+        // While the data goes over USB, that's the link the user sees.
+        let shown_link = match &usb {
+            Some(u) => LinkState::Connected { key: format!("usb:{}", u.port()), name: Some(USB_NAME.to_owned()) },
+            None => link_state.clone(),
+        };
+        let _ =
+            status.send(Status { link: shown_link, engine: engine.status(now), last_write_at, claude: claude.clone() });
     }
 }
 

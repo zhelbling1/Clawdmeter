@@ -63,7 +63,7 @@ pub enum DeviceError {
         /// The env that was flashed.
         expected: String,
         /// What answered instead (`None`: nothing did).
-        found: Option<FirmwareInfo>,
+        found: Option<Box<FirmwareInfo>>,
     },
 }
 
@@ -186,6 +186,14 @@ pub struct FirmwareInfo {
     /// Link mode, e.g. `ble`.
     #[serde(default)]
     pub link: String,
+    /// 1: the firmware takes payloads over the USB serial link
+    /// ([`crate::link`]); absent (0) on older firmware.
+    #[serde(default)]
+    pub usb: u8,
+    /// The board's BLE address (`AA:BB:…`), sent with `usb`; empty on older
+    /// firmware.
+    #[serde(default)]
+    pub mac: String,
 }
 
 fn string_or_number<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -544,7 +552,7 @@ pub fn flash_and_confirm(
     let info = wait_for_firmware(port, serial_number.as_deref(), BOOT_CONFIRM_TIMEOUT);
     match info {
         Some(i) if i.env == board.env => Ok(i),
-        found => Err(DeviceError::NotConfirmed { expected: board.env.clone(), found }),
+        found => Err(DeviceError::NotConfirmed { expected: board.env.clone(), found: found.map(Box::new) }),
     }
 }
 
@@ -671,7 +679,9 @@ mod tests {
                 env: "waveshare_amoled_18".into(),
                 ver: "1.9.0".into(),
                 rev: "co5300".into(),
-                link: "ble".into()
+                link: "ble".into(),
+                usb: 0,
+                mac: String::new(),
             }
         );
         assert!(parse_info_output("{\"ready\":true}\n").is_none());
@@ -704,8 +714,10 @@ mod tests {
             ver: "1.0".into(),
             rev: String::new(),
             link: String::new(),
+            usb: 0,
+            mac: String::new(),
         };
-        let e = DeviceError::NotConfirmed { expected: "waveshare_amoled_216".into(), found: Some(info) };
+        let e = DeviceError::NotConfirmed { expected: "waveshare_amoled_216".into(), found: Some(Box::new(info)) };
         assert!(e.to_string().contains("waveshare_amoled_18 firmware instead of waveshare_amoled_216"));
     }
 

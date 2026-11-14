@@ -83,6 +83,12 @@ commands: `flashing-and-probing-boards` skill.
 The app writes one complete JSON object per write to RX
 (`4c41555a-…-0002`); the firmware buffer is 512 B and the app caps writes at
 500. Every write is a full update. Fields and UUIDs: `docs/protocol.md`.
+The same payloads can also arrive as one JSON line each over the board's USB
+serial port (replies `{"ack":true}`, `{"err":true}`, `{"dismiss":true}`);
+see "USB serial link" in `docs/protocol.md`. While the desktop app runs, its
+daemon holds a board with USB-link firmware open, so `pio` upload/monitor,
+`serial_cmd.py` and `screenshot.py` fail with "access denied" or "busy": quit
+the app or run it with `CLAWDMETER_USB=0` first.
 
 - Usage: `s sr w wr st acct tp pd rd t tf c ok`. `sr`/`wr` = -1 means not
   started or unknown. `acct:"ent"` is a spend-capped account: `s` is spend %,

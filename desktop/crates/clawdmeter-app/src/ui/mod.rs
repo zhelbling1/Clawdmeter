@@ -161,6 +161,7 @@ pub fn run(page: Option<Page>, paths: Paths, args: WindowArgs) -> i32 {
         None if crate::onboarding::needed(&paths) => Page::Setup,
         None => Page::Overview,
     };
+    ipc::set_window_paths(&paths);
     open(move |window, cx| app::AppView::new(paths.clone(), page, args.manifest.clone(), window, cx));
     drop(lock);
     0

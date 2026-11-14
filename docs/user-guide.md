@@ -1,7 +1,9 @@
 # User guide
 
-You need a supported board, a USB data cable, Bluetooth, and Claude Code
-installed and signed in to an account that reports usage limits.
+You need a supported board, a USB data cable, and Claude Code installed and
+signed in to an account that reports usage limits. The board gets its data
+over Bluetooth, or over the USB cable on most boards
+([Use USB instead of Bluetooth](#use-usb-instead-of-bluetooth)).
 See the [supported boards](../README.md#supported-boards).
 
 ## Installation
@@ -82,6 +84,44 @@ For normal operation, the app looks for an OS-known Clawdmeter rather than
 connecting to arbitrary nearby devices. On boards with a software-controlled
 PWR button, hold it for about 3 seconds, then release to clear the device's
 Bluetooth bonds. The LCD-4's PWR key resets the board; it does not clear pairing.
+
+## Use USB instead of Bluetooth
+
+The board can get its data over the USB cable instead of Bluetooth.
+
+1. Plug the board into the computer with a data cable.
+2. Update the firmware from **Flash** if it is older than this feature. Older
+   firmware doesn't offer the USB link.
+3. Wait. The app looks for a board on USB every 10 seconds and uses it
+   when it finds one. The status shows **Clawdmeter (USB)** as connected.
+
+Pairing is optional. The meters, Clawd, alerts and chimes work over USB
+alone. The buttons send their key presses over Bluetooth only, so they type
+nothing until the board is also paired. If both links are up, data goes over
+USB and the Bluetooth link stays connected for the buttons. If the cable
+is pulled, data goes back to Bluetooth.
+
+If a board is paired over Bluetooth, the app uses a USB board only when it
+is that same board. A second board plugged in to charge is left alone and
+checked again after 5 minutes. With nothing paired, any board with the USB
+link is used.
+
+The app lets go of the port while the **Flash** page or setup is open, and
+takes it back a few seconds after you leave. The meters may pause briefly
+meanwhile. The **Device** page only borrows the port for a moment per action,
+so the link stays up and the page says **Connected over USB**.
+
+A board with older firmware (no USB link) is asked again after 5 minutes, and
+a port that doesn't answer after 20 seconds. Opening **Flash** resets that
+wait.
+
+Set `CLAWDMETER_USB=0` to turn the USB link off.
+
+It works on boards whose USB port is the chip's own (ESP32-S3 and C6
+boards). It doesn't work on boards that reach USB through a CH340 or CP210x
+bridge chip, such as the Cheap Yellow Displays and the M5Stack FIRE, or on
+the Guition ESP32-S3-4848S040, whose serial output is on UART0. These keep
+using Bluetooth.
 
 ## Hooks and privacy
 
@@ -334,7 +374,7 @@ clawdmeter hook MODE [event]    Handle a Claude Code hook: alert, clear, or even
 
 `CLAWDMETER_LOG=debug` enables debug logs. `CLAWDMETER_NO_TRAY=1` uses a
 window instead of a tray icon. `CLAWDMETER_BLE_ADDRESS` selects the paired
-device address to try first.
+device address to try first. `CLAWDMETER_USB=0` turns off the USB data link.
 
 ## Connection help
 

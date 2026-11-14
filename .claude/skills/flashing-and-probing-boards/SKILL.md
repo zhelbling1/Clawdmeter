@@ -36,6 +36,11 @@ and fails with a clear message when no board or several are attached. If
 `pyserial` is missing, run it with `~/.platformio/penv/bin/python`. Close any
 `pio device monitor` first; it holds the port.
 
+The desktop app's daemon keeps a board with USB-link firmware open while it
+runs, so this gets "access denied" (Windows) or "busy" (Linux/macOS). Quit the
+app, or run it with `CLAWDMETER_USB=0`, first. (Keeping the app's Flash page
+open also makes it let go of the port.)
+
 | Command | Reply / effect |
 | --- | --- |
 | `info` | JSON: env, version, panel revision, link state |

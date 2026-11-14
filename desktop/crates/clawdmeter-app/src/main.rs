@@ -90,9 +90,9 @@ fn main() {
             0
         }
         "--info" => match args.get(1) {
-            Some(port) => match clawdmeter_flash::device::probe_info(port, std::time::Duration::from_secs(2)) {
+            Some(port) => match probe_info_cli(&paths, port) {
                 Ok(Some(i)) => {
-                    println!("env={} ver={} rev={} link={}", i.env, i.ver, i.rev, i.link);
+                    println!("env={} ver={} rev={} link={} usb={}", i.env, i.ver, i.rev, i.link, i.usb);
                     0
                 }
                 Ok(None) => {
@@ -123,6 +123,16 @@ fn main() {
         }
     };
     std::process::exit(code);
+}
+
+/// `--info PORT`: borrow the port from a running daemon's USB link, then ask
+/// the firmware who it is.
+fn probe_info_cli(
+    paths: &Paths,
+    port: &str,
+) -> Result<Option<clawdmeter_flash::FirmwareInfo>, clawdmeter_flash::device::DeviceError> {
+    clawdmeter_app::ipc::claim_and_wait(paths, std::time::Duration::from_secs(3));
+    clawdmeter_flash::device::probe_info(port, std::time::Duration::from_secs(2))
 }
 
 /// The bash / Python daemon this app replaces would fight it for the device.

@@ -217,6 +217,9 @@ pub struct AttentionState {
     pub alert_unsent: bool,
     /// A clear for a shown alert hasn't been sent yet.
     pub clear_unsent: bool,
+    /// The unsent alert is a resend ([`AttentionState::resend`]): it goes out
+    /// without `b`, so the device doesn't chime for it twice.
+    pub quiet: bool,
 }
 
 /// Fields to merge into the next payload.
@@ -241,6 +244,7 @@ impl AttentionState {
                 self.alert = Some(a);
                 self.alert_unsent = true;
                 self.clear_unsent = false;
+                self.quiet = false;
                 raised = true;
             }
         }
@@ -295,7 +299,7 @@ impl AttentionState {
     pub fn fields(&self, beep_on: bool) -> AttentionFields {
         let mut f = AttentionFields::default();
         if self.alert_unsent {
-            f.beep = beep_on;
+            f.beep = beep_on && !self.quiet;
             f.message = self.alert.as_ref().map(|a| a.device_message().to_owned());
         }
         f.clear = self.clear_unsent;
@@ -306,11 +310,23 @@ impl AttentionState {
     pub fn mark_sent(&mut self) {
         self.alert_unsent = false;
         self.clear_unsent = false;
+        self.quiet = false;
     }
 
     /// Forget everything (new connection).
     pub fn reset(&mut self) {
         *self = AttentionState::default();
+    }
+
+    /// The device may have lost what was sent: an alert that is up goes out
+    /// again with the next payload, without a chime (it rang the first time).
+    /// One not sent yet stays as it is, chime included.
+    pub fn resend(&mut self) {
+        if self.alert.is_some() && !self.alert_unsent {
+            self.alert_unsent = true;
+            self.clear_unsent = false;
+            self.quiet = true;
+        }
     }
 }
 
@@ -318,6 +334,32 @@ impl AttentionState {
 mod tests {
     use super::*;
     use std::fs::File;
+
+    #[test]
+    fn resend_brings_back_a_shown_alert_only() {
+        let mut s = AttentionState::default();
+        s.resend();
+        assert_eq!(s, AttentionState::default());
+        s.alert = Some(Alert {
+            message: "m".into(),
+            session: "a".into(),
+            kind: AlertKind::parse(None),
+            at: SystemTime::UNIX_EPOCH,
+        });
+        // Not sent yet: a resend changes nothing, and it still chimes.
+        s.alert_unsent = true;
+        s.resend();
+        assert!(s.fields(true).beep && !s.quiet);
+        s.mark_sent();
+        assert!(!s.pending());
+        // Sent: it goes out again with its message, but silently.
+        s.resend();
+        assert!(s.alert_unsent && s.pending());
+        let f = s.fields(true);
+        assert!(f.message.is_some() && !f.beep);
+        s.mark_sent();
+        assert!(!s.quiet);
+    }
 
     fn tmpdir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("cm-attn-{tag}-{}", std::process::id()));

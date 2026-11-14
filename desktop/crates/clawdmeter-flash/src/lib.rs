@@ -23,6 +23,7 @@
 #![warn(missing_docs)]
 
 pub mod device;
+pub mod link;
 pub mod manifest;
 pub mod release;
 

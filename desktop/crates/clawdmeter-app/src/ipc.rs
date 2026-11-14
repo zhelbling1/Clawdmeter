@@ -15,6 +15,12 @@
 //!   process takes the file (rename, read, delete) every tick.
 //! - `window-commands`: `show <page>` lines for the window process, taken the
 //!   same way: bring the window to the front on that page.
+//! - `usb-claim` / `usb-held`: who has the board's USB port. The daemon's
+//!   USB link ([`clawdmeter_flash::link`]) writes the port name to
+//!   `usb-held` while it has the port open. The window writes the time to
+//!   `usb-claim` while the flasher is up (the Flash page or setup) and
+//!   before each USB call ([`before_usb`], the Device page too); the daemon
+//!   lets the port go while the claim is fresh.
 
 use std::fs;
 use std::io::{self, Write as _};
@@ -437,9 +443,90 @@ pub fn load_latest_release(paths: &Paths) -> Option<String> {
     fs::read_to_string(latest_release_file(paths)).ok().map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
 }
 
+/// A claim younger than this keeps the daemon off the USB port.
+pub const USB_CLAIM_SECS: i64 = 4;
+/// How long [`before_usb`] waits for the daemon to let the port go.
+const USB_RELEASE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// `<state>/usb-claim`: unix seconds of the window's last claim on the port.
+pub fn usb_claim_file(paths: &Paths) -> PathBuf {
+    paths.state_dir.join("usb-claim")
+}
+
+/// `<state>/usb-held`: the port the daemon's USB link has open.
+pub fn usb_held_file(paths: &Paths) -> PathBuf {
+    paths.state_dir.join("usb-held")
+}
+
+/// Tell the daemon the window needs the USB port now.
+pub fn claim_usb(paths: &Paths, now: i64) {
+    let _ = fs::create_dir_all(&paths.state_dir);
+    let _ = fs::write(usb_claim_file(paths), now.to_string());
+}
+
+/// The window claimed the port within [`USB_CLAIM_SECS`].
+pub fn usb_claimed(paths: &Paths, now: i64) -> bool {
+    fs::read_to_string(usb_claim_file(paths))
+        .ok()
+        .and_then(|t| t.trim().parse::<i64>().ok())
+        .is_some_and(|t| (now - t).abs() <= USB_CLAIM_SECS)
+}
+
+/// The daemon's USB link has the port open.
+pub fn usb_held(paths: &Paths) -> bool {
+    usb_held_file(paths).exists()
+}
+
+static WINDOW_PATHS: std::sync::OnceLock<Paths> = std::sync::OnceLock::new();
+
+/// The window process's paths, for [`before_usb`] (set once at start).
+pub fn set_window_paths(paths: &Paths) {
+    let _ = WINDOW_PATHS.set(paths.clone());
+}
+
+/// Before the window (or a CLI command) opens the board's port: claim it and
+/// wait, up to a few seconds, for the daemon's USB link to close it.
+/// Blocking; call it off the UI thread. Does nothing before
+/// [`set_window_paths`].
+pub fn before_usb() {
+    if let Some(p) = WINDOW_PATHS.get() {
+        claim_and_wait(p, USB_RELEASE_WAIT);
+    }
+}
+
+/// [`before_usb`] with explicit paths and wait.
+pub fn claim_and_wait(paths: &Paths, wait: std::time::Duration) {
+    claim_usb(paths, clawdmeter_core::unix_now());
+    let start = std::time::Instant::now();
+    while usb_held(paths) && start.elapsed() < wait {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn usb_claim_is_fresh_for_a_few_seconds() {
+        let dir = std::env::temp_dir().join(format!("clawdmeter-usbclaim-{}", std::process::id()));
+        let paths = Paths::under(&dir);
+        assert!(!usb_claimed(&paths, 1000));
+        claim_usb(&paths, 1000);
+        assert!(usb_claimed(&paths, 1000));
+        assert!(usb_claimed(&paths, 1000 + USB_CLAIM_SECS));
+        assert!(!usb_claimed(&paths, 1001 + USB_CLAIM_SECS));
+        // Nothing holds the port: no wait.
+        let t = std::time::Instant::now();
+        claim_and_wait(&paths, std::time::Duration::from_secs(5));
+        assert!(t.elapsed() < std::time::Duration::from_secs(1));
+        // A held port that's never let go: the wait gives up.
+        fs::write(usb_held_file(&paths), "COM9").unwrap();
+        let t = std::time::Instant::now();
+        claim_and_wait(&paths, std::time::Duration::from_millis(200));
+        assert!(t.elapsed() >= std::time::Duration::from_millis(200));
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn window_open_elsewhere_follows_the_lock() {

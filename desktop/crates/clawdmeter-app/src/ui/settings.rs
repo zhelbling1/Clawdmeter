@@ -358,6 +358,7 @@ impl SettingsView {
             || {
                 let port = device::list_ports().into_iter().next().map(|p| p.path);
                 let Some(port) = port else { return (None, None) };
+                ipc::before_usb();
                 let info = device::probe_info(&port, Duration::from_millis(1500)).ok().flatten();
                 (Some(port), info)
             },
@@ -381,7 +382,10 @@ impl SettingsView {
         self.device.unpair = None;
         run_blocking(
             cx,
-            move || device::query_json(&port, "unpair", "unpair", Duration::from_millis(1500)),
+            move || {
+                ipc::before_usb();
+                device::query_json(&port, "unpair", "unpair", Duration::from_millis(1500))
+            },
             |v, r, _| {
                 v.device.busy = false;
                 v.device.unpair = Some(match r {
@@ -564,6 +568,9 @@ impl SettingsView {
         let (link_tone, link): (Tone, SharedString) = match snap.as_ref() {
             None => (Tone::Plain, "Clawdmeter isn't running".into()),
             Some(s) => match s.link.as_str() {
+                "connected" if s.device_key.as_deref().is_some_and(|k| k.starts_with("usb:")) => {
+                    (Tone::Ok, "Connected over USB".into())
+                }
                 "connected" => (Tone::Ok, "Bluetooth connected".into()),
                 "no_adapter" => (Tone::Bad, "Bluetooth unavailable".into()),
                 "connecting" => (Tone::Accent, "Connecting…".into()),

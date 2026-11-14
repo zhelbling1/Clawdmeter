@@ -14,7 +14,9 @@ takes about 2 s. Write it outside the repo unless it belongs in the PR.
 
 - **Port**: the only `/dev/ttyACM*` or `/dev/cu.usbmodem*` attached; pass
   `--port` when there are several. Close any `pio device monitor` first, it
-  holds the port. Opening the port doesn't reset the board.
+  holds the port. Opening the port doesn't reset the board. The desktop app
+  holds it too while it runs (USB link): quit it or run it with
+  `CLAWDMETER_USB=0` first, or you get "access denied" / "busy".
 - **pyserial missing**: run it with `~/.platformio/penv/bin/python`.
 - **C6 boards can't be captured**: no PSRAM for the snapshot, so the script
   stops with a message. Eyeball those on the panel, or check the same UI in

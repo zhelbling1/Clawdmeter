@@ -145,9 +145,11 @@ impl FlashHardware for Usb {
         device::list_ports().into_iter().map(|p| p.path).collect()
     }
     fn probe_info(&self, port: &str) -> Option<FirmwareInfo> {
+        crate::ipc::before_usb();
         device::probe_info(port, Duration::from_millis(1500)).ok().flatten()
     }
     fn probe_chip(&self, port: &str) -> Result<ChipInfo, DeviceError> {
+        crate::ipc::before_usb();
         device::probe_chip(port)
     }
     fn flash(
@@ -157,6 +159,7 @@ impl FlashHardware for Usb {
         board: &BoardImage,
         progress: &mut dyn FnMut(FlashProgress),
     ) -> Result<(), DeviceError> {
+        crate::ipc::before_usb();
         device::flash_merged(port, image, board, progress)
     }
 }

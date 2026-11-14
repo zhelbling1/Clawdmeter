@@ -76,6 +76,13 @@ impl AppView {
                     v.go(*page, cx);
                     window.activate_window();
                 }
+                // The flasher (its page or the setup wizard's) keeps the
+                // port while it's up; the Device page only borrows it for
+                // each probe (`ipc::before_usb`), so it can still show the
+                // USB link it's checking.
+                if matches!(v.page(), Page::Flash | Page::Setup) {
+                    ipc::claim_usb(&p, clawdmeter_core::unix_now());
+                }
                 // Light/dark can change after the first frame (on X11 it
                 // arrives from the settings portal). Polled rather than
                 // observed: GPUI 0.2.2's X11 client redraws inside the portal

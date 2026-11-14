@@ -8,6 +8,7 @@
 #include "data.h"
 #include "ui.h"
 #include "ble.h"
+#include "serial_link.h"
 #include "performer.h"
 #include "mascot.h"
 #include "clawd_director.h"
@@ -135,9 +136,12 @@ static void clear_pairing(const char* why) {
 }
 
 // ---- Serial command buffer ----
-#define CMD_BUF_SIZE 80   // fits `theme` + the 66-digit palette
+// Fits `theme` + the 66-digit palette, and a whole USB-link payload (the app
+// caps payloads at 500 B, the same limit as a BLE write; serial_link.h).
+#define CMD_BUF_SIZE 520
 static char cmd_buf[CMD_BUF_SIZE];
 static int cmd_pos = 0;
+static bool cmd_overflow = false;   // this line didn't fit: drop it whole
 
 static void send_screenshot() {
 #ifndef BOARD_HAS_PSRAM
@@ -178,10 +182,12 @@ static void send_screenshot() {
 }
 
 // One JSON line identifying this build, for the desktop flasher's first
-// detection probe. Keys are fixed: env, ver, rev, link.
+// detection probe. Keys are fixed: env, ver, rev, link; `usb:1` says this
+// firmware takes payloads over the USB serial link (serial_link.h), and `mac`
+// is its BLE address, so the app uses USB only for the board it paired.
 static void send_info() {
-    Serial.printf("{\"env\":\"%s\",\"ver\":\"%s\",\"rev\":\"%s\",\"link\":\"ble\"}\n",
-                  CLAWD_ENV, CLAWD_VERSION, board_hal_rev());
+    Serial.printf("{\"env\":\"%s\",\"ver\":\"%s\",\"rev\":\"%s\",\"link\":\"ble\",\"usb\":1,\"mac\":\"%s\"}\n",
+                  CLAWD_ENV, CLAWD_VERSION, board_hal_rev(), ble_get_mac_address());
 }
 
 static void check_serial_cmd() {
@@ -189,7 +195,14 @@ static void check_serial_cmd() {
         char c = Serial.read();
         if (c == '\n' || c == '\r') {
             cmd_buf[cmd_pos] = '\0';
-            if (strcmp(cmd_buf, "screenshot") == 0) send_screenshot();
+            if (cmd_overflow) {
+                // Only a payload is ever this long; a command never is.
+                if (cmd_buf[0] == '{') serial_link_overflow();
+                cmd_overflow = false;
+            }
+            else if (cmd_buf[0] == '{') serial_link_feed(cmd_buf);   // USB link payload
+            else if (strcmp(cmd_buf, "ping") == 0) serial_link_ping();   // USB link keepalive, no reply
+            else if (strcmp(cmd_buf, "screenshot") == 0) send_screenshot();
             else if (strcmp(cmd_buf, "chime") == 0 || strcmp(cmd_buf, "buzz") == 0) sound_hal_chime();
             else if (strncmp(cmd_buf, "chime ", 6) == 0) {
                 // Dev tool for tuning a board's speaker: `chime <gain> [volume]`,
@@ -249,6 +262,8 @@ static void check_serial_cmd() {
             cmd_pos = 0;
         } else if (cmd_pos < CMD_BUF_SIZE - 1) {
             cmd_buf[cmd_pos++] = c;
+        } else {
+            cmd_overflow = true;
         }
     }
 }
@@ -267,6 +282,9 @@ void setup() {
     // attachInterrupt() accepts the service already being installed.
     gpio_install_isr_service(ARDUINO_ISR_FLAG);
 
+    // A USB-link payload is up to 500 B in one burst; the loop may be busy
+    // rendering when it lands, so give the RX side room for two.
+    Serial.setRxBufferSize(1024);
     Serial.begin(115200);
     delay(300);
     Serial.println("{\"ready\":true}");
@@ -315,7 +333,7 @@ void setup() {
     director_init();    // rooms + beats; boots on the meters (home)
     clawd_prefs_init();  // the saved device settings, before the app says otherwise
 
-    Serial.printf("Dashboard ready (%s, %dx%d) %lu ms after boot, waiting for data on BLE...\n",
+    Serial.printf("Dashboard ready (%s, %dx%d) %lu ms after boot, waiting for data on BLE or USB...\n",
         board_caps().name, W, H, (unsigned long)millis());
 }
 
@@ -472,7 +490,10 @@ void loop() {
     performer_tick();
     mascot_tick();
     director_tick();
-    if (director_take_dismissed()) ble_send_dismiss();
+    if (director_take_dismissed()) {
+        ble_send_dismiss();
+        if (serial_link_active()) serial_link_send_dismiss();
+    }
     // Rotation transition (blank + ramp) would fight the idle fade — skip
     // ticks while the panel is dark. A rotation that happens during sleep
     // is detected by the next tick after wake and ramped in then.
@@ -555,7 +576,9 @@ void loop() {
         touch_pair_tick();
     }
 
-    ble_state_t bs = ble_get_state();
+    // A live USB link shows as connected: the meters don't care which way
+    // the payloads came.
+    ble_state_t bs = serial_link_active() ? BLE_STATE_CONNECTED : ble_get_state();
     if (bs != last_ble_state) {
         last_ble_state = bs;
         ui_update_ble_status(bs, ble_get_device_name(), ble_get_mac_address());
@@ -577,8 +600,13 @@ void loop() {
 
     check_serial_cmd();
 
-    if (ble_has_data()) {
-        if (parse_json(ble_get_data(), &usage)) {
+    // One payload per loop; BLE first, then the USB serial link. The ack
+    // goes back the way the payload came.
+    const bool from_ble = ble_has_data();
+    const bool from_usb = !from_ble && serial_link_has_data();
+    if (from_ble || from_usb) {
+        const char* json = from_ble ? ble_get_data() : serial_link_get_data();
+        if (parse_json(json, &usage)) {
             // Fast + slow clock bookkeeping: rate sample (replays skipped),
             // hook activity lift, event dedupe. See signals.h.
             const SignalsUpdate sig = signals_ingest(&usage);
@@ -625,9 +653,9 @@ void loop() {
             if (g_after != g_before)
                 Serial.printf("usage rate: group %d -> %d (s=%.2f%%)\n",
                     g_before, g_after, usage.session_pct);
-            ble_send_ack();
+            if (from_ble) ble_send_ack(); else serial_link_send_ack(true);
         } else {
-            ble_send_nack();
+            if (from_ble) ble_send_nack(); else serial_link_send_ack(false);
         }
     }
 

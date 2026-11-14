@@ -52,3 +52,39 @@ seconds) and sends `x` if the device still shows it.
 | `pm` | Pace marker: `1` draws a line on the session and weekly bars at the elapsed share of each window (5 hours, 7 days) and colours the fill by pace (green at or behind it, amber ahead, red at 100%); `0` keeps the plain 50/80% colours. A bar with no reset time (`sr`/`wr` = -1) and spend-capped accounts keep the plain colours. Sent like `lv` and stored the same way; absent = keep the stored value. |
 | `k1`, `k2`, `k3` | What the primary, secondary and PWR buttons do (a PWR short press; its hold to pair is fixed). An integer: `0` nothing, `1` Space (held while the button is held: voice push to talk), `2` Shift+Tab, `3` Tab, `4` Enter, `5` Esc, `6` cycle brightness; `0x10000 \| hold << 12 \| mods << 8 \| usage` a keyboard shortcut, `usage` a HID keyboard usage `0x04`–`0x73` (A to F24), `mods` the HID modifier bits Ctrl `1`, Shift `2`, Alt `4`, GUI (Cmd/Win/Super) `8`, `hold` `1` = the keys stay down while the button is held, `0` = tapped; `0x20000 \| usage` a HID Consumer usage `1`–`0x3FF` (the app sends Play/Pause `0xCD`, Previous `0xB6`, Next `0xB5`, Volume down `0xEA`, Volume up `0xE9`, Mute `0xE2`; volume repeats while the button is held, the rest tap). Example: Ctrl+Shift+M tapped is `66320` (`0x10310`). Defaults `k1` = `1`, `k2` = `2`, `k3` = `6`; a value outside these fields, or not an integer, is ignored like an absent key (the device keeps its stored action; the app reads an unknown config value as the default). PWR always taps: its press registers on release. On touchless boards a primary press (or a PWR press, where PWR is the only button) first dismisses an alert whatever its action. Sent like `lv` and stored the same way; absent = keep the stored value. Boards ignore the value for a button they don't have; the T4-S3's long BOOT hold, which stands in for a PWR press there, stays brightness. |
 | `th` | Palette: 66 hex digits, eleven `rrggbb` colours run together in this order: background, cards, text, secondary text, accent, green, amber, red, bar track, Clawd, face eyes (`firmware/src/theme_palette.h`). The board repaints live and keeps it in NVS; a string of any other length or with a non-hex digit is ignored. The Clawd colour paints the screensaver face and the sprite: at draw time the official art's body orange and the shaded side of his body become that colour and the same shade of it, while his eyes, props and scenery keep their own colours (`theme_clawd_art`; the frames are never changed). The app sends a preset theme's palette (for the System theme, Dark or Light by the computer's appearance) or the user's own colours; the board doesn't know which. Boards with a 1-bit panel (`BoardCaps.mono_panel`, the e-paper board) ignore it and keep the default palette. Absent = keep the stored palette. |
+
+## USB serial link
+
+The board can take the same payloads over its USB serial port (115200 baud,
+the port the `info`, `clawd` and `theme` serial commands use). It is an
+alternative to Bluetooth for data. Buttons still send key presses over
+Bluetooth only.
+
+- **Framing.** Any line that starts with `{` is a payload: the same JSON
+  object the app writes to RX, one per line, at most 500 bytes. The app sends
+  each as `\n{json}\n`. The leading newline ends any half-written line left
+  by a timed-out write, so the firmware drops that one bad line and not the
+  next payload too. The firmware ignores empty lines. Its serial command
+  buffer is 520 bytes and the payload buffer 512. A longer line is dropped
+  and answered `{"err":true}`.
+- **Replies.** Single JSON lines, mixed into the normal log output:
+  `{"ack":true}` after a payload parsed, `{"err":true}` if it didn't,
+  `{"dismiss":true}` when the user ends an alert on the device (only while the
+  USB link is up), and `{"ready":true}` at boot. The app reads `ready` as
+  "the board restarted and has no data".
+- **Order.** BLE and USB payloads go down the same parse path. At most one
+  payload is handled per loop, BLE first. An ack goes back over the link its
+  payload came in on.
+- **Freshness.** The USB link counts as up for 150 s after the last payload
+  (`SERIAL_LINK_FRESH_MS`) or the last `ping`. `ping` (sent as `\nping\n`)
+  is a serial command the firmware answers with nothing; it only marks the link
+  fresh. The app's link thread sends one every 30 s when it has sent nothing
+  else, so the link stays up for as long as the app holds the port, even with
+  no data to send (stale data, logged out, before the first good poll). While
+  the link is up the board shows itself as connected even if Bluetooth isn't;
+  the meters go stale if the data does.
+- **Detection.** The `info` reply carries `"usb":1` when the firmware has the
+  link, for example
+  `{"env":"...","ver":"...","rev":"...","link":"ble","usb":1,"mac":"AA:BB:CC:DD:EE:FF"}`.
+  `mac` is the board's BLE address, uppercase. Older firmware lacks `usb`, and
+  the app doesn't use USB with it.

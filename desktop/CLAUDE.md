@@ -46,7 +46,12 @@ is faked behind `FlashHardware`.
   subscription, zombie-write breaker, BlueZ trust, macOS stale-bond unpair via `blueutil`,
   Windows bonded-address fallback (PnP / `CLAWDMETER_BLE_ADDRESS`).
 - `clawdmeter-flash`: downloads the release `manifest.json`, matches boards by
-  chip + flash size, writes with espflash.
+  chip + flash size, writes with espflash. `link` is the USB data link:
+  `SerialLink` (one background thread owns the port, writes queued payloads,
+  reads replies; sends `ping` after 30 s of silence), `probe_port`,
+  `same_board`, `parse_line`, `frame` (`\n{json}\n`). `FirmwareInfo.usb` is
+  the `"usb"` flag of the `info` reply (serde default 0); `FirmwareInfo.mac`
+  its `"mac"` (the board's BLE address, uppercase; serde default empty).
 - `clawdmeter-app`: the `clawdmeter` binary. Tray (`tray/`, ksni on Linux),
   window (`ui/`), `daemon.rs` (drives the engine on its own thread: 0.5 s
   tick, config re-read every 5 s and on `Command::ReloadSettings`),
@@ -62,11 +67,11 @@ is faked behind `FlashHardware`.
   [--manifest PATH]`; `--ports`; `--info PORT`; `hook MODE [event]`.
 - Env: `CLAWDMETER_LOG`, `CLAWDMETER_NO_TRAY`, `POLL_INTERVAL`,
   `CLAUDE_CONFIG_DIR` (default account), `CLAWDMETER_BLE_ADDRESS`,
-  `CLAWDMETER_DECORATIONS`.
+  `CLAWDMETER_DECORATIONS`, `CLAWDMETER_USB` (`0` turns the USB link off).
 - State lives in one dir, `~/.config/clawdmeter/` (Windows:
   `%LOCALAPPDATA%\Clawdmeter\`): `config`, `events.log`, `attention`,
-  `clear-<sid>`, `ble-address`, `daemon.log`, `usage-blocks.json`, app
-  state and locks.
+  `clear-<sid>`, `ble-address`, `daemon.log`, `usage-blocks.json`,
+  `usb-claim`, `usb-held`, app state and locks.
 - Config keys: `config_dirs`, `poll_interval`, `heartbeat_interval`,
   `reset_chime` and `alert_chime` (device chimes; the old `chime` / `beep`
   keys are read when these are absent), `desktop_chime` (the same ding on
@@ -223,9 +228,42 @@ Per account (`probe.rs`, `oauth.rs`):
   `--window` launch, appends `show <page>` to `<state>/window-commands`; the
   window switches page and raises itself. Child views ask for another page by
   emitting `ui::Navigate`.
-- Nothing competes for the serial port: the flasher (`ui/flasher.rs`) touches
-  USB only while on screen (`set_active`), the Device page probes only while
-  shown, and the sidebar locks while a board is being written.
+- The serial port is shared with the daemon's USB link (`clawdmeter_flash::link`).
+  Every 10 s the daemon probes each Espressif USB port (VID 0x303A) with
+  `info` and uses the first whose firmware reports `"usb":1`. If the app has a
+  paired BLE address cached (`ble-address`) and the reply's `mac` differs, the
+  board is left alone ("isn't the paired one; leaving it to Bluetooth") and
+  re-checked after 5 min; with nothing paired, or no `mac`, any board with the
+  link is used. Probe backoff: firmware without `usb:1`, or another board, is
+  asked again after 5 min; a port that didn't answer or couldn't be opened,
+  after 20 s. The backoff is forgotten when the window claims the port. Scans
+  skip ports waiting out a retry. While a link is
+  open every write goes over USB instead of BLE; BLE stays connected for the
+  buttons. If the link drops, writes go back to BLE. The engine resends with
+  `Engine::resend_all(lost)` (all settings and the numbers, alert state kept;
+  `lost = true` also re-sends an alert that is up, silently: no `b`, via
+  `AttentionState::resend` / `quiet`): `false` when the window takes the
+  port, `true` when a USB link opens (the board may have restarted unheard),
+  the link dies, the board reboots (`{"ready":true}`, plus a refresh request)
+  or rejects a payload (`{"err":true}`). `on_connected` (real BLE reconnects)
+  starts the alert state over, but only when USB isn't carrying the data; a
+  BLE reconnect beside a USB link changes nothing. Status shows connected as `usb:<port>`,
+  `Clawdmeter (USB)`. Classic ESP32 boards behind a CH340/CP210x bridge and
+  boards whose `Serial` is on UART0 (`ARDUINO_USB_CDC_ON_BOOT=0`) are not
+  probed.
+  Hand-off: `<state>/usb-held` holds the port name while the daemon has it
+  open; while a scan probes ports it contains `scanning` (and the port name
+  once a link is open), and the scan checks the window's claim between ports
+  and before opening, and stops if claimed. The window writes unix seconds to
+  `<state>/usb-claim` every 0.5 s only while the Flash page or the setup
+  wizard is up, and right before every USB call (`ipc::before_usb`, which also
+  waits up to 3 s for `usb-held` to go). The Device page doesn't keep the claim
+  fresh: it borrows the port per probe/unpair call through `before_usb`, so
+  the USB link comes back while it's open. The daemon closes the port while
+  the claim is under 4 s old (`USB_CLAIM_SECS`). The flasher
+  (`ui/flasher.rs`) touches USB only while on screen (`set_active`), the
+  Device page probes only on demand, and the sidebar locks while a board is
+  being written.
 - The wizard reuses the flasher (`FlashMode::Setup`: no step header,
   up-to-date boards can skip) and the Hooks page
   (`SettingsView::show(Page::Hooks, embedded)`). First run = no
