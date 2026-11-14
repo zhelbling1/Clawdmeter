@@ -1,0 +1,18 @@
+[
+  {
+    "file": "Clawd-Moonwalk.gif",
+    "name": "moonwalk",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      27
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The moonwalk and its stagecraft from 1980s pop performances: white fedora, a single sparkly glove, toe stand, hat tip.",
+    "frames": 39,
+    "ms": 5940,
+    "colours": 9,
+    "kb": 40
+  }
+]

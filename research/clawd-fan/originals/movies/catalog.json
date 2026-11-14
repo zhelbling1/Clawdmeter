@@ -1,0 +1,18 @@
+[
+  {
+    "file": "Clawd-Briefcase.gif",
+    "name": "the briefcase",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      15,
+      18
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The glowing briefcase from Pulp Fiction (1994): slicked-back hair, skinny black tie, golden light from an unseen inside.",
+    "frames": 29,
+    "ms": 5920,
+    "colours": 11,
+    "kb": 29.9
+  }
+]
