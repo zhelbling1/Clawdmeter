@@ -14,5 +14,101 @@
     "ms": 5920,
     "colours": 11,
     "kb": 29.9
+  },
+  {
+    "file": "Clawd-Opal.gif",
+    "name": "the opal",
+    "mood": "calm",
+    "rows": 39,
+    "loop": [
+      13,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The black opal from Uncut Gems (2019): tight curls, glasses, gold chain, a rough stone held up to the light with a galaxy of colour inside.",
+    "frames": 25,
+    "ms": 5070,
+    "colours": 16,
+    "kb": 34.3
+  },
+  {
+    "file": "Clawd-SaberDuel.gif",
+    "name": "saber duel",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      13,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The laser-sword duel from The Empire Strikes Back (1980): hero with a blue blade, a dark lord in a black helmet-mask, breathing vent and cape with a red blade, the dramatic reach. No lines quoted.",
+    "frames": 26,
+    "ms": 6260,
+    "colours": 16,
+    "kb": 39
+  },
+  {
+    "file": "Clawd-CupRipples.gif",
+    "name": "cup ripples",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      17,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The rippling water glass from Jurassic Park (1993): safari hat, denim shirt, red neckerchief, rings in a cup at each distant footstep.",
+    "frames": 29,
+    "ms": 6330,
+    "colours": 13,
+    "kb": 34.9
+  },
+  {
+    "file": "Clawd-BoulderRun.gif",
+    "name": "boulder run",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      13,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The rolling-boulder temple escape from Raiders of the Lost Ark (1981): brown fedora, leather jacket, satchel, whip, golden idol on a pedestal.",
+    "frames": 27,
+    "ms": 5270,
+    "colours": 14,
+    "kb": 39.1
+  },
+  {
+    "file": "Clawd-KingOfTheWorld.gif",
+    "name": "king of the world",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      10,
+      15
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The arms-wide moment at the bow of the ship in Titanic (1997): floppy blond hair in the wind, open white shirt and braces, sea spray, a passing gull.",
+    "frames": 25,
+    "ms": 5020,
+    "colours": 13,
+    "kb": 38.8
+  },
+  {
+    "file": "Clawd-HeresClawdy.gif",
+    "name": "here's clawdy",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      18,
+      21
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The axe-through-the-door scene from The Shining (1980), as a cartoon: messy hair, wild eyebrows, a grin through a chopped hole. Caption is a pun on the line.",
+    "frames": 28,
+    "ms": 5780,
+    "colours": 12,
+    "kb": 38.4
   }
 ]
