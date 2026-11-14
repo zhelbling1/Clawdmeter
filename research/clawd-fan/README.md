@@ -49,15 +49,15 @@ claudepix originals.
 
 | Name | Frames | Plays in |
 |---|---|---|
-| idle blossom | 6 | Idle group, calm dip |
-| idle hearts | 13 | Idle group, calm dip, and a corner act (24x28, same left edge as the seated Clawd) |
-| fm listening (headphones) | 16 | Normal group |
-| swim summer (sunglasses, ring) | 14 | Normal group |
-| space | 8 | Normal group |
-| work out (dumbbells) | 8 | Active group |
-| surfing | 8 | Active group |
-| hanabi (fireworks over a roof; Clawd himself is not drawn) | 30 | Active group |
-| jumping blossom (40x40) | 14 | Active group |
-| this is fine | 10 | Heavy group |
+| idle blossom | 6 | Calm dip |
+| idle hearts | 13 | Calm dip, and a corner act (Idle mood; 24x28, same left edge as the seated Clawd) |
+| fm listening (headphones) | 16 | Calm dip |
+| swim summer (sunglasses, ring) | 14 | Show, Active set |
+| space | 8 | Calm dip |
+| work out (dumbbells) | 8 | Show, Active set |
+| surfing | 8 | Show, Active set |
+| hanabi (fireworks over a roof; Clawd himself is not drawn) | 30 | Show, Active set |
+| jumping blossom (40x40) | 14 | Show, Active set |
+| this is fine | 10 | Show, Heavy set |
 
 Frame counts are after the converter collapses repeated frames.

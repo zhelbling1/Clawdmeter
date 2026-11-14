@@ -12,8 +12,10 @@
 // in-room secondary action while seated and `autonomy` is on: jittered idle
 // gaps, mood-picked acts (never the same twice running) and the lurk trip.
 //
-// The corner sprite works on every board (its ~23 KB buffer falls back to
-// internal RAM). The full-size sprite is an LVGL image with PSRAM (~250 KB);
+// The corner sprite works on every board (its buffer, sized by area for the
+// largest corner act, the trumpet at 50x21 cells of the corner cell size,
+// about 28 KB on 480 px panels, falls back to internal RAM).
+// The full-size sprite is an LVGL image with PSRAM (~250 KB);
 // without it, boards with direct_performer draw it straight to the panel
 // (direct_sprite.h), and the rest skip the lurk trip and wave and point from
 // the seat for attention.

@@ -617,7 +617,10 @@ void loop() {
                     const int32_t action = board_caps().has_pwr_button ? button_action_get(BTN_SLOT_PWR)
                                                                        : (int32_t)BTN_ACT_BRIGHTNESS;
                     const bool brightness = button_action_decode(action).kind == BTN_KIND_BRIGHTNESS;
-                    if (!brightness || !pages_enabled()) {
+                    // The page / double-press split is for a real PWR key only:
+                    // a faked press (a long BOOT hold) can't be doubled in time,
+                    // so there it stays plain brightness.
+                    if (!brightness || !pages_enabled() || !board_caps().has_pwr_button) {
                         button_run_press(BTN_SLOT_PWR, &pwr_run, action, false);
                     } else if (pwr_tap_pending) {
                         pwr_tap_pending = false;

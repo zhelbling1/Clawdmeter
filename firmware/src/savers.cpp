@@ -28,7 +28,14 @@ static lv_color_t c_shimmer(void) { return lv_color_mix(theme_color(TH_CLAWD), l
 static const uint32_t C_BLUE = 0x4AA3FF;
 
 static const char* const NAMES[SAVER_COUNT] = { "starfield", "code rain", "constellation" };
+// Every effect frame repaints the whole screen (the stars and the dots are
+// everywhere). Without PSRAM LVGL renders it in small partial strips and the
+// flush is the cost, so those boards run the effects at about 12 fps.
+#ifdef BOARD_HAS_PSRAM
 static const uint16_t FRAME_MS[SAVER_COUNT] = { 33, 50, 50 };
+#else
+static const uint16_t FRAME_MS[SAVER_COUNT] = { 80, 80, 80 };
+#endif
 
 // One effect at a time: their particles share one block.
 #define NSTAR   90
@@ -66,6 +73,7 @@ static void stars_draw(lv_layer_t* layer) {
     r.radius = LV_RADIUS_CIRCLE;
     const float f = RAD * 0.5f;
     const lv_color_t warm = lv_color_mix(c_orange(), lv_color_white(), 40), shim = c_shimmer();
+    const lv_area_t clip = layer->_clip_area;
     for (int i = 0; i < NSTAR; i++) {
         const Star& s = fx.stars[i];
         const float inv = 1.0f / s.z;
@@ -74,6 +82,12 @@ static void stars_draw(lv_layer_t* layer) {
         const float ip = 1.0f / zp;
         const float px = CX + s.x * ip * f, py = CY + s.y * ip * f;
         if (x < -4 || y < -4 || x > W + 4 || y > H + 4) continue;
+        // Only the stars in the strip being drawn (as rain_draw does): LVGL
+        // renders in strips, and queueing all of them for every strip can
+        // run its draw-task pool dry.
+        const float ty = y < py ? y : py, by = y < py ? py : y;
+        const float lx = x < px ? x : px, rx = x < px ? px : x;
+        if (by + 4 < clip.y1 || ty - 4 > clip.y2 || rx + 4 < clip.x1 || lx - 4 > clip.x2) continue;
         const float b = 1.0f - s.z;
         const int opa = 30 + (int)(b * (PEAK_OPA - 30));
         const lv_color_t c = s.tint ? shim : warm;
@@ -221,6 +235,7 @@ static void dots_draw(lv_layer_t* layer) {
     const int rr = scale < 0.7f ? 1 : 2;
     for (int i = 0; i < NDOT; i++) {
         const Dot& d = fx.dots[i];
+        if (d.y + rr < clip.y1 || d.y - rr > clip.y2 || d.x + rr < clip.x1 || d.x - rr > clip.x2) continue;
         r.bg_color = d.blue ? cb : co;
         lv_area_t a = { (int)d.x - rr, (int)d.y - rr, (int)d.x + rr, (int)d.y + rr };
         lv_draw_rect(layer, &r, &a);

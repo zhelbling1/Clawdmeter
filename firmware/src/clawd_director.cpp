@@ -769,8 +769,10 @@ static void run_page(uint32_t now) {
 bool director_page_open(void) {
     if (beat == B_PAGE) return true;
     if (minimal) return false;
-    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PEEK ||
-        beat == B_PET) {
+    // The tap-peek's face is curious about you: buttons and PWR don't drop it
+    // (only a tap, attention or its own timeout do), so PWR opens nothing here.
+    if (beat == B_PEEK) return false;
+    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PET) {
         engage();
         resume_screensaver = false;
         to_meters(false);                     // "show me the meters" first

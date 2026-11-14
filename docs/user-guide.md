@@ -264,10 +264,13 @@ and character rules.
 On boards whose screen fits it (480×480 and the other panels at least 320
 px wide and 172 px tall; not the small portrait screens or minimal-display
 boards), Clawd has a page of his own: a short press of **PWR** opens it and
-another brings the meters back. Two quick presses still cycle the
-brightness. Tapping the page also brings the meters back. This works while
-PWR is set to **Brightness** (the default); with PWR remapped to a key or
-media control, PWR does that instead and the page stays closed.
+another brings the meters back. Brightness is now a double press (two
+quick presses). That is only on boards with a real PWR button: on a board
+whose PWR is faked from a long BOOT hold, like the LILYGO T4-S3, the hold
+stays brightness and there is no page key. PWR doesn't open the page while
+the tap-peek face is up. Tapping the page also brings the meters back. This
+works while PWR is set to **Brightness** (the default); with PWR remapped to
+a key or media control, PWR does that instead and the page stays closed.
 
 On the page Clawd is large, in a little pixel-art scene: outside playing
 (walking, skating, ball games) when Claude is idle, and at his desk typing

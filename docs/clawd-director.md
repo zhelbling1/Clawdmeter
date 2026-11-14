@@ -15,7 +15,7 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/clawd_director.{h,cpp}` | Owns the rooms and runs the beats. It is the only module that decides what Clawd does next. |
 | `firmware/src/clawd_policy.{h,cpp}` | Pure decision rules, unit-tested in `test/test_clawd_policy`: show gate and show group, screensaver gate, where attention returns to, how long a reaction waits for him, the corner seat's headroom, turn tracker, no-repeat picker, jitter, the resting face's rhythm, what a tap on the meters earns (the peek, how he sets off), where the face looks and how long it stays curious, and all tunables (`ClawdTuning`). |
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
-| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes (and the clawd-tank fan clips, below) at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM only. |
+| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes (and the clawd-tank fan clips, below) at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM, or drawn straight to the panel on boards with `direct_performer`. |
 | `firmware/src/direct_sprite.{h,cpp}` | A full-size Clawd drawn straight to the panel without a screen-sized buffer, for `direct_performer` boards: the performer, the lurk trip and the attention walk-on use it there. Its diff and blit sizing are pure and unit-tested in `test/test_direct_sprite`. Ported from [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter). |
 | `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver, the held peek and pet mode's face (per-eye offsets, eye shape, a held squint: `face_look_each`, `face_set_eye_shape`, `face_set_squint`). |
 | `firmware/src/pet.{h,cpp}`, `pet_props.{h,cpp}` | Pet mode: drives the face while the `pet` beat has it up (touch, tilt, moods, gags) and draws its props (sweat drop, z z Z, thinking dot, speech pill) with one draw-callback object. |
@@ -134,15 +134,18 @@ an official but unlisted persona GIF.
 
 | Mood group | Full-size scenes |
 |---|---|
-| Idle / sleepy | magnifier, walking, pointing, lurking, book, eating (fan), idle blossom (fan), idle hearts (fan) |
-| Normal | crab walking, waving, trumpet, basketball, fm listening (fan), swim summer (fan), space (fan) |
-| Active | laptop, dancing, skateboard, soccer, work out (fan), surfing (fan), hanabi (fan), jumping blossom (fan) |
-| Heavy burn | racing car, cloud, sailing scene, jumping happy, baking (fan), this is fine (fan) |
-| Calm dip | magnifier, walking, book, eating (fan), idle blossom (fan), idle hearts (fan) |
+| Idle / sleepy | magnifier, walking, pointing, lurking, book, eating (fan), idle blossom (fan), idle hearts (fan), fm listening (fan), space (fan), tank idle, tank sleeping (listed for reference: shows never draw from it) |
+| Normal | crab walking, waving, trumpet, basketball (listed for reference: shows never draw from it) |
+| Active | laptop, dancing, skateboard, soccer, work out (fan), surfing (fan), hanabi (fan), jumping blossom (fan), swim summer (fan), tank typing, thinking, debugger, grooving, conducting, juggling, wizard |
+| Heavy burn | racing car, cloud, sailing scene, jumping happy, baking (fan), this is fine (fan), tank carrying, builder, building |
+| Calm dip | magnifier, walking, book, eating (fan), idle blossom (fan), idle hearts (fan), fm listening (fan), space (fan), tank idle, tank sleeping; tank low battery instead on a board running low on its own battery |
 
-Corner acts are unchanged except that the idle group also draws idle hearts
-(fan; 24×28 cells, on the seated Clawd's own left edge, inside the corner
-buffer the other acts already size). hanabi draws no Clawd at all (fireworks
+Shows only ever draw from Active and Heavy (`clawd_show_group` floors at
+Active); calm dips draw from `CALM_NAMES`. The corner acts draw from
+`ACTS_BY_RATE`: the idle group also draws idle hearts and tank idle, the
+normal group tank idle too (fan; idle hearts is 24×28 cells, on the seated
+Clawd's own left edge, inside the corner buffer the other acts already size),
+and while Claude works he sits at the laptop (the laptop act). hanabi draws no Clawd at all (fireworks
 over a roof), so while it plays the stage has none; the one-Clawd rule holds.
 
 **Where attention returns to** (`attention_resumes_screensaver`):
@@ -240,7 +243,9 @@ black, never above ~70 % opacity, everything moving: OLED-friendly. He walks
 off before an effect starts, and anything that ends the screensaver takes
 it down as he turns around to walk back (`test_director` fails if a Clawd is
 ever on screen with an effect). They draw from fixed arrays sharing one
-~1.5 KB block, 20–30 fps, nothing while the panel sleeps.
+~1.5 KB block, 20–30 fps (about 12 fps without PSRAM, where every frame is a
+full-screen render in partial strips), nothing while the panel sleeps. Each
+effect queues only the shapes inside the strip being drawn.
 
 ### A tap on the meters (the aquarium)
 
@@ -248,6 +253,12 @@ While the director is on the meters (`home`, or `corner`: a commanded act, a
 walk home), every tap draws his attention and the face comes up to see what
 you want (`clawd_tap_react`). There's no cooldown and no lesser reaction:
 the face is what a tap on the glass gets.
+
+**Where you tap decides.** On live meters, a tap in the header (everything
+above the first card: the title, the battery, Clawd in his seat;
+`ui_header_hit`) starts pet mode (`clawd_tap_react_at`, below); a tap
+anywhere else on the meters is the peek, described here. On stale meters a
+header tap is still the peek.
 
 - **Seated** (or in an idle act of his own): a startled hop on the next frame
   (`jumping` from frame 1, its crouch, not the idle frame every act opens
@@ -507,8 +518,13 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
     60×17 cells, two bytes each (about 3.6 KB); the three share one blit
     buffer of at most one 480 px row of 8 px cells (7.5 KB; a row of 12 px
     cells goes out in two writes), since only one Clawd is ever on screen.
-    About 11 KB of heap in all, allocated at `ui_init`, before the chime
-    takes its buffer.
+    Heap in all, allocated at `ui_init`, before the chime takes its buffer:
+    the corner buffer grows from 22.7 to 28.4 KB, the direct sprite's blit
+    strip is 7.5 KB, the attention grids 2 × 840 B and the lurk grids
+    2 × 1,020 B. With about 4 KB of static arrays (confetti 60 × 28 B, effects
+    1.4 KB), that is about 21 KB of new internal RAM on the C6. The boot line
+    `chime: largest internal block … room for N of 18411 frames` is the
+    check.
   - New full-size work needs nothing special: performer scenes (any name in
     `GROUP_NAMES` / `CALM_NAMES`, `performer_perform`,
     `performer_perform_group`) and the mascot's full-size modes go through

@@ -151,7 +151,17 @@ static int  right_edge(int y) { int a, b; panel_row_span(screen_w, screen_h, rou
 // trumpet's crop starts 13 cells before his body), so his body stays put.
 static void draw_corner(void) {
     const int dx = (anim && walk_anim) ? (anim->ox - walk_anim->ox) * cell : 0;
-    render(anim, frame, facing < 0, &dsc, buf, img, cell, x + (facing < 0 ? -dx : dx), feet_y);
+    int px = x + (facing < 0 ? -dx : dx);
+    // A wide persona act (the trumpet starts 13 cells before his body) would
+    // hang off the glass's left edge from a seat near it: nudge the frame in,
+    // checking its top and bottom rows (a round panel's edge curves).
+    if (anim && facing > 0 && mode != M_WALK) {
+        int edge = left_edge(feet_y - 1);
+        const int top = left_edge(feet_y - anim->h * cell);
+        if (top > edge) edge = top;
+        if (px < edge) px = edge;
+    }
+    render(anim, frame, facing < 0, &dsc, buf, img, cell, px, feet_y);
 }
 // A frame on a direct sprite's grid, left edge at px, feet on its bottom row.
 static void draw_direct(DirectSprite* s, int px, bool mirror) {
@@ -563,7 +573,10 @@ static void seated_tick(uint32_t now) {
         return;
     }
     const ClawdAnim* a = clawd_anim(act);
-    if (!a) { seated_since = now; return; }
+    // The same checks as a commanded act (mascot_act), but an idle act is
+    // optional: one taller than the headroom above his seat, or bigger than
+    // the corner buffer, is skipped rather than clipped or swapped.
+    if (!a || feet_y - a->h * cell < 0 || corner_bytes(a) > buf_bytes) { seated_since = now; return; }
     start_frames(a);
     speed = 100;
     act_left = 1;

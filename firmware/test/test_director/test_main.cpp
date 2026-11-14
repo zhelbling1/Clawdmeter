@@ -409,11 +409,21 @@ static void test_page_has_the_one_clawd(void) {
     assert_one_clawd();
 }
 
-// With the face up the page waits: the first press sends the face home.
+// With the screensaver face up the page waits: the first press sends the face
+// home. The tap-peek's face is left alone (buttons and PWR don't drop it).
 static void test_page_waits_for_the_face(void) {
     fresh_director();
     run_for(500);
     TEST_ASSERT_TRUE(director_debug("peek"));
+    for (int i = 0; i < 100 && !face_visible(); i++) run_for(100);
+    TEST_ASSERT_TRUE(face_visible());
+    TEST_ASSERT_FALSE(director_page_open());      // the peek keeps its face
+    TEST_ASSERT_EQUAL_STRING("peek", director_beat_name());
+    TEST_ASSERT_TRUE(face_visible());
+    director_tap(240, 300);                       // a tap drops it
+    run_for(5000);
+
+    TEST_ASSERT_TRUE(director_debug("screensaver 0"));   // the face screensaver
     for (int i = 0; i < 100 && !face_visible(); i++) run_for(100);
     TEST_ASSERT_TRUE(face_visible());
     TEST_ASSERT_FALSE(director_page_open());      // the face goes home instead
