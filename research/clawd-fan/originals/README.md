@@ -49,7 +49,8 @@ in-front gap) are in `gaming/props.js`.
 | --- | --- | --- | --- |
 | Level up! | `gaming/levelup.js` | active | Old School RuneScape woodcutting: chopping a yew until the level-up fireworks. |
 | Cardboard box | `gaming/box.js` | active | Metal Gear Solid (1998): hiding under a cardboard box, bandana and sneaking suit, the red "!" alert. |
-| Barrel roll | `gaming/barrelroll.js` | active | Star Fox 64 (1997): "Do a barrel roll!" Generic aviator costume; no ships or characters. |
+| Portal fall | `gaming/portal.js` | active | Portal (2007): the infinite fall between a blue portal on the floor and an orange one on the ceiling, faster every pass, until they snap shut and he lands dizzy. Generic oval portals; no logos, game UI or cake. |
+| Barrel roll | `gaming/barrelroll.js` | active | Star Fox 64 (1997): "Do a barrel roll!" He turns into a Clawd-shaped starfighter (his own body turned on its side as the fuselage, his legs as four engines, drawn-on nose cone, canopy, wing roots and cannons) and rolls with a corkscrew trail. No ships or characters copied. |
 ## Dances (`music/`)
 
 Dance moves only: no song titles, no lyrics, no likenesses. `music/props.js`
