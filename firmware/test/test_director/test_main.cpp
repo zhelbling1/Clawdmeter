@@ -15,11 +15,13 @@ static char     broke_what[96];
 
 static void check_one_clawd(void) {
     const OnScreen s = fake_on_screen();
-    if (broke || fake_clawds(s) <= 1) return;
+    // The Clawd page (pages.cpp) shows him while the director says it has him.
+    const bool page = director_on_page();
+    if (broke || fake_clawds(s) + (int)page <= 1) return;
     broke = true;
     broke_at = fake_now_ms;
-    snprintf(broke_what, sizeof(broke_what), "beat %s:%u corner %d big %d performer %d face %d",
-             director_beat_name(), step, s.corner, s.big, s.performer, s.face);
+    snprintf(broke_what, sizeof(broke_what), "beat %s:%u corner %d big %d performer %d face %d page %d",
+             director_beat_name(), step, s.corner, s.big, s.performer, s.face, page);
 }
 
 // Which beats a run went through, so a fuzz pass can't be vacuous.
@@ -31,6 +33,8 @@ static void run_for(uint32_t ms) {
         fake_now_ms += TICK_MS;
         fake_actors_tick();
         director_tick();
+        // The page module closes the page when a tap asked for the meters.
+        if (director_on_page() && director_take_page_exit()) director_page_closed();
         seen[beat] = true;
         check_one_clawd();
     }
@@ -130,7 +134,7 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big) {
         t += gap;
         UsageData d = live_payload();
         SignalsUpdate sig = no_signal();
-        switch (fz_next() % 16) {
+        switch (fz_next() % 18) {
         case 0: case 1:  world.activity = (int)fz_range(0, 3); break;
         case 2:          world.activity = 3; break;
         case 3: case 4:  sig.event_fired = true; sig.event = "psb"[fz_next() % 3]; sig.event_seq = ++es; break;
@@ -147,6 +151,8 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big) {
             continue;
         }
         case 14:         director_set_liveliness((int)fz_range(1, 5)); continue;
+        case 15:         (void)director_page_open(); continue;     // PWR: the Clawd page
+        case 16:         director_page_closed(); continue;         // PWR again: the meters
         default:         break;                   // a quiet stretch
         }
         d.session_pct = pct;
@@ -155,6 +161,7 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big) {
     assert_one_clawd();
     // Left alone afterwards, nothing hangs: whatever was running finishes
     // and he ends up home or in the screensaver.
+    director_page_closed();
     director_alert_clear();
     world.meters_live = true;
     world.activity = 0;
@@ -334,9 +341,60 @@ static void test_fuzz_one_clawd_at_every_attention_animation(void) {
     assert_one_clawd();
 }
 
+// The Clawd page takes him from the meters: the corner Clawd is away while
+// it's up, an alert stays on the page (a tap dismisses it), the next tap asks
+// for the meters, and he walks back to his seat.
+static void test_page_has_the_one_clawd(void) {
+    fresh_director();
+    world.has_big = false;
+    run_for(500);
+    TEST_ASSERT_TRUE(director_page_open());
+    TEST_ASSERT_EQUAL_STRING("page", director_beat_name());
+    TEST_ASSERT_TRUE(director_room() == ROOM_PAGE);
+    run_for(30 * 1000);                           // quiet, busy: nothing starts behind it
+    world.activity = 3;
+    run_for(30 * 1000);
+    TEST_ASSERT_EQUAL_STRING("page", director_beat_name());
+    director_alert("needs you");
+    run_for(1000);
+    TEST_ASSERT_EQUAL_STRING("page", director_beat_name());
+    TEST_ASSERT_TRUE(director_alert_active());
+    TEST_ASSERT_EQUAL_STRING("needs you", director_alert_message());
+    director_tap(100);                            // dismisses, stays on the page
+    TEST_ASSERT_FALSE(director_alert_active());
+    TEST_ASSERT_TRUE(director_take_dismissed());
+    TEST_ASSERT_FALSE(director_take_page_exit());
+    world.activity = 0;
+    director_tap(100);                            // "show me the meters"
+    TEST_ASSERT_TRUE(director_take_page_exit());
+    director_page_closed();
+    TEST_ASSERT_FALSE(director_on_page());
+    TEST_ASSERT_EQUAL_STRING("corner", director_beat_name());   // walking back in
+    run_for(5 * 1000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    assert_one_clawd();
+}
+
+// With the face up the page waits: the first press sends the face home.
+static void test_page_waits_for_the_face(void) {
+    fresh_director();
+    run_for(500);
+    TEST_ASSERT_TRUE(director_debug("peek"));
+    for (int i = 0; i < 100 && !face_visible(); i++) run_for(100);
+    TEST_ASSERT_TRUE(face_visible());
+    TEST_ASSERT_FALSE(director_page_open());      // the face goes home instead
+    TEST_ASSERT_EQUAL_STRING("face-home", director_beat_name());
+    run_for(5000);
+    TEST_ASSERT_TRUE(director_page_open());
+    assert_one_clawd();
+    director_page_closed();
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_screensaver_calm_dip_keeps_one_clawd);
+    RUN_TEST(test_page_has_the_one_clawd);
+    RUN_TEST(test_page_waits_for_the_face);
     RUN_TEST(test_fuzz_one_clawd_with_full_size_sprite);
     RUN_TEST(test_fuzz_one_clawd_without_full_size_sprite);
     RUN_TEST(test_no_nonsense_sits_still_through_everything_but_taps);

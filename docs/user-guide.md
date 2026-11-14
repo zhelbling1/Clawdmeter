@@ -224,13 +224,36 @@ If updates stop, the meters dim. The last reading is retained rather than
 replaced with zero. See [Clawd's director](clawd-director.md) for timing
 and character rules.
 
+### The Clawd page
+
+On boards whose screen fits it (480×480 and the other panels at least 320
+px wide and 172 px tall; not the small portrait screens or minimal-display
+boards), Clawd has a page of his own: a short press of **PWR** opens it and
+another brings the meters back. Two quick presses still cycle the
+brightness. Tapping the page also brings the meters back. This works while
+PWR is set to **Brightness** (the default); with PWR remapped to a key or
+media control, PWR does that instead and the page stays closed.
+
+On the page Clawd is large, in a little pixel-art scene: outside playing
+(walking, skating, ball games) when Claude is idle, and at his desk typing
+on his laptop while Claude works, with blinds closing between the two. The
+office wall has an LED countdown to the next 5-hour window and a poster of
+this week's usage with a burn-up chart; the device remembers the week's
+history across restarts. Both scenes follow your local time (day, dusk,
+night). When Claude needs you he yells from the page with the alert's text;
+tap to dismiss it. When usage is burning fast he gets angry. On a 480×480
+screen the scene is drawn at 1.5× and fills the panel.
+
+The page comes from [ludwich/Clawdmeter](https://github.com/ludwich/Clawdmeter),
+a fork that has no licence file.
+
 ### Buttons
 
 | Button | Action |
 | --- | --- |
 | BOOT | By default, hold to send Space to the focused window, for Claude Code voice input. GPIO 0 on S3; GPIO 9 on C6. |
 | Secondary, where fitted | By default, send Shift+Tab to the focused window. S3 2.16: GPIO 18; C6 2.16: GPIO 10; LCD-1.54: GPIO 5. |
-| PWR, where software-controlled | Short press: by default, brightness. Hold about 3 seconds and release: clear pairing. |
+| PWR, where software-controlled | Short press: by default, brightness, or the Clawd page where the board has it (two quick presses: brightness). Hold about 3 seconds and release: clear pairing. |
 
 Each button can do something else. **Controls** on the app's Device page
 shows your board's buttons as keys, in the order they sit on it and under

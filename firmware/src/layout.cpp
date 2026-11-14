@@ -475,3 +475,24 @@ Layout layout_compute(const LayoutShape& shape) {
 int16_t layout_lone_card_y(const Layout& L) {
     return L.card[0].y + (stack_bottom(L) - L.card[0].y - L.card[0].h) / 2;
 }
+
+// ─── The Clawd page's scene ──────────────────────────────────────────────────
+LayoutScene layout_scene(const LayoutShape& shape, int16_t art_w, int16_t art_h) {
+    LayoutScene s = { false, 0, { 0, 0, 0, 0 } };
+    if (art_w <= 0 || art_h <= 0) return s;
+    int k = 2 * shape.w / art_w;
+    if (2 * shape.h / art_h < k) k = 2 * shape.h / art_h;
+    if (shape.round) {
+        // The art's corners on the circle: (art_w k / 4)^2 + (art_h k / 4)^2 <= r^2.
+        const int32_t d = 2 * (int32_t)(shape.w < shape.h ? shape.w : shape.h);   // 4r
+        while (k >= 2 && (int32_t)art_w * art_w * k * k + (int32_t)art_h * art_h * k * k > d * d) k--;
+    }
+    if (k < 2) return s;
+    s.fits = true;
+    s.scale2 = (int16_t)k;
+    s.box.w = (int16_t)(art_w * k / 2);
+    s.box.h = (int16_t)(art_h * k / 2);
+    s.box.x = (int16_t)((shape.w - s.box.w) / 2);
+    s.box.y = (int16_t)((shape.h - s.box.h) / 2);
+    return s;
+}

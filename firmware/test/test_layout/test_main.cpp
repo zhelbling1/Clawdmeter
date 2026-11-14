@@ -265,6 +265,45 @@ static void test_small_240x240(void) {
 }
 
 // Kerned, per-glyph-rounded widths, as lv_font_get_glyph_width sums them.
+// The Clawd page's 320x172 scene: the largest half-step scale on the glass,
+// centred; no page under 1x.
+static void test_scene_page(void) {
+    for (const Panel& p : PANELS) {
+        P = &p;
+        const LayoutScene s = layout_scene({ p.w, p.h, p.round }, 320, 172);
+        if (!s.fits) {
+            if (!p.round && p.w >= 320 && p.h >= 172) fail("scene: no page though 1x fits", { 0, 0, p.w, p.h });
+            continue;
+        }
+        const Box b = { s.box.x, s.box.y, s.box.w, s.box.h };
+        TEST_ASSERT_TRUE(s.scale2 >= 2);
+        TEST_ASSERT_EQUAL_INT(320 * s.scale2 / 2, s.box.w);
+        TEST_ASSERT_EQUAL_INT(172 * s.scale2 / 2, s.box.h);
+        check_on_glass("scene", b);
+        // The largest: the next half step wouldn't fit.
+        const int nw = 320 * (s.scale2 + 1) / 2, nh = 172 * (s.scale2 + 1) / 2;
+        const bool bigger = nw <= p.w && nh <= p.h &&
+            (!p.round || (nw / 2.0f) * (nw / 2.0f) + (nh / 2.0f) * (nh / 2.0f) <=
+                         (p.w < p.h ? p.w : p.h) * (p.w < p.h ? p.w : p.h) / 4.0f);
+        if (bigger) fail("scene: a bigger scale fits", b);
+    }
+    // 480x480 (the 2.16s, LCD-4): 1.5x, full width, centred.
+    LayoutScene s = layout_scene({ 480, 480, false }, 320, 172);
+    TEST_ASSERT_TRUE(s.fits);
+    TEST_ASSERT_EQUAL_INT16(3, s.scale2);
+    TEST_ASSERT_EQUAL_INT16(0, s.box.x);   TEST_ASSERT_EQUAL_INT16(111, s.box.y);
+    TEST_ASSERT_EQUAL_INT16(480, s.box.w); TEST_ASSERT_EQUAL_INT16(258, s.box.h);
+    // Round 466: 1.5x would put the corners off the circle.
+    s = layout_scene({ 466, 466, true }, 320, 172);
+    TEST_ASSERT_TRUE(s.fits);
+    TEST_ASSERT_EQUAL_INT16(2, s.scale2);
+    TEST_ASSERT_EQUAL_INT16(73, s.box.x);  TEST_ASSERT_EQUAL_INT16(147, s.box.y);
+    // 320x240 landscape: 1x; portrait 240x320 and 240x240: no page.
+    TEST_ASSERT_EQUAL_INT16(2, layout_scene({ 320, 240, false }, 320, 172).scale2);
+    TEST_ASSERT_FALSE(layout_scene({ 240, 320, false }, 320, 172).fits);
+    TEST_ASSERT_FALSE(layout_scene({ 240, 240, false }, 320, 172).fits);
+}
+
 static void test_text_width(void) {
     TEST_ASSERT_EQUAL_INT32(371, layout_text_width(&font_styrene_28, "for 3 seconds, then release"));
     TEST_ASSERT_EQUAL_INT32(0, layout_text_width(&font_styrene_28, ""));
@@ -288,6 +327,7 @@ int main(int, char**) {
     RUN_TEST(test_compact_368x448);
     RUN_TEST(test_large_410x502);
     RUN_TEST(test_small_240x240);
+    RUN_TEST(test_scene_page);
     RUN_TEST(test_text_width);
     RUN_TEST(print_layouts);
     return UNITY_END();
