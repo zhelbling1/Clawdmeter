@@ -29,6 +29,18 @@ except ImportError:
 BAUD = 115200  # monitor_speed of every env in firmware/platformio.ini
 
 
+def open_port(path, baud, timeout):
+    """Open without touching the board: DTR/RTS stay low, so neither opening
+    nor closing the port resets it (pyserial's default raises both, and on
+    Windows the drop on close resets an ESP32's USB-Serial-JTAG)."""
+    sp = serial.Serial()
+    sp.port, sp.baudrate, sp.timeout = path, baud, timeout
+    sp.dtr = False
+    sp.rts = False
+    sp.open()
+    return sp
+
+
 def default_port():
     found = sorted(glob.glob("/dev/ttyACM*") + glob.glob("/dev/cu.usbmodem*"))
     if len(found) == 1:
@@ -55,7 +67,7 @@ def main():
         sys.exit("screenshot is a binary framebuffer dump: use the capturing-device-screenshots skill")
 
     try:
-        port = serial.Serial(port_path, BAUD, timeout=0.05)
+        port = open_port(port_path, BAUD, 0.05)
     except serial.SerialException as e:
         sys.exit(f"cannot open {port_path}: {e} (is a serial monitor holding it?)")
 
