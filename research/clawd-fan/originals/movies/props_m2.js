@@ -139,23 +139,35 @@ function grin(g, P, { w = 8, teeth = C.ivory, ink = C.eye } = {}) {
 
 /**
  * Laser sword held at (hx, hy) pointing at angle `deg` (0 = right, -90 =
- * up), blade `len` cells (0 = unlit). A white core, a glow cell either side,
- * a steel hilt with a dark grip behind the hand.
+ * up), blade `len` cells (0 = unlit). The core is a solid, edge-connected
+ * white line (a diagonal gets a staircase, never a dotted line) and the
+ * glow is a one-cell coloured edge all round it, past the tip too, so the
+ * blade reads as a bright laser with a coloured halo at any angle instead
+ * of a striped stick. A steel emitter and a dark grip sit under the hand.
  */
 function saber(g, hx, hy, deg, len, { glow = C.blue, core = C.ivory, hilt = C.steel, grip = C.charcoal } = {}) {
   const a = deg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a);
   const at = (t) => [Math.round(hx + dx * t), Math.round(hy + dy * t)];
-  // Glow sides: perpendicular, rounded to a whole cell.
-  // Glow on one side (the side facing up / outward), so the blade reads
-  // as a bright core with a coloured halo rather than a striped stick.
-  let px = Math.round(-dy * 1.2), py = Math.round(dx * 1.2);
-  if (py > 0 || (py === 0 && px < 0)) { px = -px; py = -py; }
-  if (!px && !py) py = -1;
-  const pts = [];
-  for (let t = 2; t <= len + 1; t += 0.5) pts.push(at(t));
-  for (const [x, y] of pts) put(g, x + px, y + py, glow);
-  if (len) { const [tx, ty] = at(len + 2); put(g, tx, ty, glow); }
-  for (const [x, y] of pts) put(g, x, y, core);
+  if (len > 0) {
+    // Core: walk the blade in small steps; where it moves diagonally, add
+    // the corner cell so the line stays edge-connected.
+    const cells = new Map();
+    let prev = null;
+    for (let t = 2; t <= len + 1.001; t += 0.25) {
+      const c = at(t);
+      if (prev && c[0] !== prev[0] && c[1] !== prev[1]) {
+        const corner = Math.abs(dx) >= Math.abs(dy) ? [c[0], prev[1]] : [prev[0], c[1]];
+        cells.set(corner.join(), corner);
+      }
+      cells.set(c.join(), c);
+      prev = c;
+    }
+    // Glow: every edge neighbour of the core.
+    for (const [x, y] of cells.values())
+      for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+        if (!cells.has((x + u) + ',' + (y + v))) put(g, x + u, y + v, glow);
+    for (const [x, y] of cells.values()) put(g, x, y, core);
+  }
   // Hilt: grip under the hand, steel emitter in front.
   const [ax, ay] = at(-1), [bx, by] = at(0), [cx, cy] = at(1);
   put(g, ax, ay, grip); put(g, bx, by, grip); put(g, cx, cy, hilt);
