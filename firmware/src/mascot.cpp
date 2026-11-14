@@ -71,10 +71,11 @@ static uint8_t  big_act = 0;           // 0 waving, 1 pointing (attention, eithe
 static ClawdRng rng;
 
 // Per mood group: how long he sits between acts and which acts he picks.
-// "lurking" = the walk-off / full-size lurk / walk-back trip.
+// "lurking" = the walk-off / full-size lurk / walk-back trip. "tank idle" is
+// the clawd-tank fan clip of him idling (looks around, yawns, stretches).
 static const char* const ACTS_BY_RATE[4][4] = {
-    { "pointing", "lurking", "idle hearts", NULL    },   // idle: sparse, sneaky
-    { "waving",   "lurking", "pointing", NULL      },   // normal
+    { "pointing", "lurking", "idle hearts", "tank idle" }, // idle: sparse, sneaky
+    { "waving",   "lurking", "pointing", "tank idle" }, // normal
     { "waving",   "dancing", "lurking",  NULL      },   // active
     { "dancing",  "waving",  "dancing",  "lurking" },   // heavy: can't sit still
 };
@@ -92,6 +93,7 @@ static const char* const CORNER_ANIMS[] = {
     "walking", "waving", "pointing", "dancing", "jumping happy", "trumpet", "magnifier",
     "laptop",        // ludwich: while Claude works
     "idle hearts",   // fan-made (TB1982), 24x28 on the same left edge
+    "tank idle",     // fan-made (clawd-tank), 36 columns wide
 };
 static size_t corner_bytes(const ClawdAnim* a) { return (size_t)(a->w * cell) * (a->h * cell) * 3; }
 // While Claude works he sits at the laptop, with only this short pause

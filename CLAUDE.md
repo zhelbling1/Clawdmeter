@@ -135,8 +135,9 @@ Adding or renaming a key means changing both sides: `clawdmeter-core`'s
   what inspired it, and add no credit line for it.
 - **Clawd sprite art comes from the official animations** in
   `research/clawd-official/`, plus the credited fan-made ones in this fork's
-  `research/clawd-fan/` (category `fan`); never draw or retouch sprite frames
-  yourself, and never put fan art in the official folder. The
+  `research/clawd-fan/` (category `fan`: rizowski, TB1982, and the MIT
+  clawd-tank set); never draw or retouch sprite frames yourself, and never
+  put fan art in the official folder. The
   palette's Clawd colour swaps his body orange at draw time
   (`theme_clawd_art`) and leaves the frames as published. The large
   screensaver face is the exception: it's built from LVGL shapes and may be

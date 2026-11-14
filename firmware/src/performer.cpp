@@ -6,6 +6,7 @@
 #include "perf.h"
 #include "splash_geometry.h"
 #include "hal/board_caps.h"
+#include "hal/power_hal.h"
 #include <Arduino.h>
 #include <string.h>
 #include <esp_heap_caps.h>
@@ -36,26 +37,39 @@ static DirectSprite ds;
 static bool ready(void) { return img || direct; }
 
 // ─── Mood groups ─────────────────────────────────────────────────────────────
+// "tank …" are the clawd-tank fan clips (research/clawd-fan/clawd-tank/):
+// Clawd at work (typing, thinking, debugging) and having fun with it in the
+// Active set, heavy lifting in the Heavy set, resting in the Idle set.
 #define GROUP_COUNT 4
-#define GROUP_MAX   8
+#define GROUP_MAX   16
 // Names in the first four slots of each group are the official scenes; the
 // rest are the Book (official, unlisted) and the fan-made ones in
-// research/clawd-fan/ (rizowski's baking/eating, TB1982's drawings).
+// research/clawd-fan/: rizowski's baking/eating, TB1982's drawings and the
+// clawd-tank clips ("tank ..."). Shows only ever draw from the active and
+// heavy groups (clawd_show_group's floor) and calm dips from CALM_NAMES, so
+// the idle and normal rows list scenes for reference, not for shows.
 static const char* const GROUP_NAMES[GROUP_COUNT][GROUP_MAX] = {
     { "magnifier", "walking", "pointing", "lurking",          // idle / sleepy
-      "book", "eating", "idle blossom", "idle hearts" },
-    { "crab walking", "waving", "trumpet", "basketball",      // normal pace
-      "fm listening", "swim summer", "space", NULL },
+      "book", "eating", "idle blossom", "idle hearts", "fm listening", "space",
+      "tank idle", "tank sleeping" },
+    { "crab walking", "waving", "trumpet", "basketball" },    // normal pace
     { "laptop", "dancing", "skateboard", "soccer",            // active
-      "work out", "surfing", "hanabi", "jumping blossom" },
+      "work out", "surfing", "hanabi", "jumping blossom", "swim summer",
+      "tank typing", "tank thinking", "tank debugger",
+      "tank grooving", "tank conducting", "tank juggling", "tank wizard" },
     { "racing car", "cloud", "sailing scene", "jumping happy", // heavy burn
-      "baking", "this is fine", NULL, NULL },
+      "baking", "this is fine",
+      "tank carrying", "tank builder", "tank building" },
 };
-// The screensaver's calm dips: gentle Idle-group scenes only (lurking is a
-// corner act and pointing is his "noticing" gesture).
+// The screensaver's calm dips: gentle scenes only (lurking is a corner act
+// and pointing is his "noticing" gesture).
 static const char* const CALM_NAMES[] = {
     "magnifier", "walking", "book", "eating", "idle blossom", "idle hearts",
+    "fm listening", "space", "tank idle", "tank sleeping",
 };
+// On a board running low on its own battery, the calm dip is this one.
+static const char* const CALM_LOW_BATTERY = "tank low battery";
+#define LOW_BATTERY_PCT 20
 
 // ─── Performer ───────────────────────────────────────────────────────────────
 enum PerfState { P_OFF, P_STAND, P_WALK, P_SCENE, P_CHOREO };
@@ -401,10 +415,22 @@ void performer_perform(int idx, uint32_t loop_ms) {
 static ClawdRng rng;
 static bool rng_seeded = false;
 
+// Running on its own battery, and it's low (never on USB power or a board
+// without a battery).
+static bool low_battery(void) {
+    if (!board_caps().has_battery || power_hal_is_vbus_in()) return false;
+    const int pct = power_hal_battery_pct();
+    return pct >= 0 && pct <= LOW_BATTERY_PCT;
+}
+
 void performer_perform_group(int group, uint32_t loop_ms, bool calm) {
     if (!ready()) return;
     if (!rng_seeded) { clawd_rng_seed(&rng, millis() ^ 0x57A6E); rng_seeded = true; }
     if (group < 0 || group >= GROUP_COUNT) group = 0;
+    if (calm && low_battery()) {
+        const ClawdAnim* lb = clawd_anim(CALM_LOW_BATTERY);
+        if (lb) { last_calm = lb->name; scene_start(lb, loop_ms); return; }
+    }
     const char* const* names = calm ? CALM_NAMES : GROUP_NAMES[group];
     const int n = calm ? (int)(sizeof(CALM_NAMES) / sizeof(CALM_NAMES[0])) : GROUP_MAX;
     const char*& last = calm ? last_calm : last_show;

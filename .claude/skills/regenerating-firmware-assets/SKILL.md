@@ -56,7 +56,10 @@ Soccer from their Lottie exports, the rest from GIFs) plus the fan-made ones in
 `research/clawd-fan/` (category `fan`; GIFs and TB1982's JSON grids). What the converter does (55×37 stage crops, ≤16-colour
 palettes, loop detection, synthesized eyes, contrast recolors) is in
 [tools/README.md](../../../tools/README.md); asset provenance and format
-facts are in `research/clawd-official/CLAUDE.md`. Rebuild the firmware
+facts are in `research/clawd-official/CLAUDE.md`. The clawd-tank fan clips are GIFs
+rendered from SVG by `node tools/render_clawd_tank.js` (headless Chrome)
+into `research/clawd-fan/clawd-tank/`; re-render them before converting
+when their SVGs or windows change (that folder's README). Rebuild the firmware
 afterwards and check the new or changed animation in the simulator.
 
 Clawd sprites come from the official art and the credited fan-made art in
