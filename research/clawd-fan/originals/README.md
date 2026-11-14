@@ -25,6 +25,7 @@ thumbs-up glove; some are unused since Moon bike was cut) in `movies/props_m1.js
 
 All of these are caricature: costumes and situations only, no actor
 likenesses, no logos or studio marks, captions of two words.
+
 ## Movies (movies2 set)
 
 Made for this fork; AI-drawn with the originals kit. Caricature only: no
@@ -38,6 +39,7 @@ eyebrows, grin, laser sword, clash sparks, gold chain, sweat drop, gull).
 | Cup ripples | `movies/cup_ripples.js` | The rippling water glass from *Jurassic Park* (1993): safari hat, denim shirt, red neckerchief, rings in the water at each distant thump. |
 | Boulder run | `movies/boulder_run.js` | The temple escape from *Raiders of the Lost Ark* (1981): brown fedora, leather jacket, satchel, whip, a golden idol and the rolling boulder. |
 | Here's Clawdy! | `movies/heres_clawdy.js` | The axe-through-the-door scene from *The Shining* (1980), as a cartoon: messy hair, wild eyebrows, a grin through a chopped hole. The caption is a two-word pun. |
+
 ## Gaming
 
 Made for this fork; AI-drawn with the originals kit. All references are
@@ -52,6 +54,7 @@ in-front gap) are in `gaming/props.js`.
 | Portal fall | `gaming/portal.js` | active | Portal (2007): the infinite fall between a blue portal on the floor and an orange one on the ceiling, faster every pass, until they snap shut and he lands dizzy. Generic oval portals; no logos, game UI or cake. |
 | Barrel roll | `gaming/barrelroll.js` | active | Star Fox 64 (1997): "Do a barrel roll!" He turns into a Clawd-shaped starfighter (his own body turned on its side as the fuselage, his legs as four engines, drawn-on nose cone, canopy, wing roots and cannons) and rolls with a corkscrew trail. No ships or characters copied. |
 | Rise and shine | `gaming/hl2.js` | active | Half-Life 2 (2004): a Clawd in an orange-and-grey hazard suit (little glasses, goatee, red crowbar) smashes crates while a Clawd in a blue-grey suit with a briefcase flickers in, watches, straightens his tie ("WAKE UP") and glitches away. Costumes only: no lambda or other logos, no game UI or sprites. |
+
 ## Dances (`music/`)
 
 Dance moves only: no song titles, no lyrics, no likenesses. `music/props.js`
