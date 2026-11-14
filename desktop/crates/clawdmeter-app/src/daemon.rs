@@ -330,6 +330,9 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
         log::info!("Bluetooth off in the settings; USB only");
     }
     let mut link_state = if engine.settings().bluetooth { LinkState::Starting } else { LinkState::UsbSearching };
+    // USB keys: the board's buttons, when no Bluetooth host takes them,
+    // typed here by their own thread (crate::keys).
+    let keys = crate::keys::KeyInjector::spawn();
     let mut ticker = tokio::time::interval(TICK);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -490,6 +493,8 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                             engine.request_refresh(now);
                         }
                         LinkEvent::Rejected => engine.resend_all(true),
+                        // USB keys: only before forward_keys took over.
+                        LinkEvent::Keyboard(_) | LinkEvent::Consumer(_) => keys.send(ev),
                     }
                 }
                 usb = Some(u);
@@ -503,6 +508,8 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                     if crate::ipc::usb_claimed(&paths, unix_now()) {
                         close_usb(u);
                     } else {
+                        // USB keys: straight from the link's thread.
+                        u.forward_keys(keys.sender());
                         usb = Some(u);
                         // The board may have restarted while nobody held its
                         // port (a flash, a replug), with its `{"ready":true}`

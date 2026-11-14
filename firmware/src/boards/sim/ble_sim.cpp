@@ -156,6 +156,9 @@ void ble_keyboard_report(const uint8_t r[8]) {
 }
 void ble_consumer_press(uint16_t usage) { printf("[sim] HID consumer 0x%03X\n", usage); }
 void ble_consumer_release(void) { printf("[sim] HID consumer release\n"); }
+// The sim's "host" always takes the keys (they print above).
+bool ble_hid_keyboard_ready(void) { return true; }
+bool ble_hid_consumer_ready(void) { return true; }
 
 // ---- Playback controls (called from the sim_platform event pump) ----
 void sim_playback_toggle(void) {

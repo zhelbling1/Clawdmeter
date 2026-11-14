@@ -8,12 +8,19 @@
 //! (`{"dismiss":true}`, `{"ready":true}` after a reboot, `{"err":true}`) out
 //! of the log lines around them. [`SerialLink`] is the handle; dropping it
 //! closes the port.
+//!
+//! The board's buttons also come up this link when no Bluetooth host takes
+//! them: `{"kb":"MMK1K2K3K4K5K6"}` (a keyboard report in hex) and
+//! `{"cc":<usage>}` (a media key, `0` = released). The reader thread hands
+//! those straight to a key sink ([`SerialLink::forward_keys`]), not through
+//! the daemon's tick.
 
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -31,6 +38,37 @@ const KEEPALIVE: Duration = Duration::from_secs(30);
 /// The keepalive command (the firmware answers nothing).
 const PING: &[u8] = b"\nping\n";
 
+/// A HID boot keyboard report without its reserved byte: the modifier bits
+/// (Ctrl, Shift, Alt, GUI left, then the same right) and up to six key
+/// usages (0 = none). All zero means every key is up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct KeyboardReport {
+    /// Modifier bits: 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI, 4-7 right.
+    pub modifiers: u8,
+    /// HID keyboard usages down, 0 = empty slot.
+    pub keys: [u8; 6],
+}
+
+impl KeyboardReport {
+    /// Nothing held.
+    pub fn is_empty(&self) -> bool {
+        self.modifiers == 0 && self.keys == [0; 6]
+    }
+
+    /// `MMK1K2K3K4K5K6`: 14 hex digits, either case.
+    fn from_hex(s: &str) -> Option<Self> {
+        if s.len() != 14 || !s.bytes().all(|c| c.is_ascii_hexdigit()) {
+            return None;
+        }
+        let byte = |i: usize| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok();
+        let mut keys = [0u8; 6];
+        for (i, k) in keys.iter_mut().enumerate() {
+            *k = byte(i + 1)?;
+        }
+        Some(KeyboardReport { modifiers: byte(0)?, keys })
+    }
+}
+
 /// What the board said on the link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkEvent {
@@ -40,6 +78,19 @@ pub enum LinkEvent {
     Rebooted,
     /// The firmware couldn't parse a payload (`{"err":true}`).
     Rejected,
+    /// A button's keys (`{"kb":"…"}`): the whole keyboard state, sent on
+    /// every change and again every second while anything is held.
+    Keyboard(KeyboardReport),
+    /// A media key down (`{"cc":<usage>}`, a HID consumer usage), or `0`:
+    /// released.
+    Consumer(u16),
+}
+
+impl LinkEvent {
+    /// A key event (for the key sink), not a link reply.
+    pub fn is_key(&self) -> bool {
+        matches!(self, LinkEvent::Keyboard(_) | LinkEvent::Consumer(_))
+    }
 }
 
 /// The link reply on one line of serial output, if it is one. Log lines,
@@ -48,7 +99,11 @@ pub fn parse_line(line: &str) -> Option<LinkEvent> {
     let l = line.trim();
     let v: serde_json::Value = serde_json::from_str(&l[l.find('{')?..]).ok()?;
     let is_true = |k: &str| v.get(k) == Some(&serde_json::Value::Bool(true));
-    if is_true("dismiss") {
+    if let Some(kb) = v.get("kb") {
+        kb.as_str().and_then(KeyboardReport::from_hex).map(LinkEvent::Keyboard)
+    } else if let Some(cc) = v.get("cc") {
+        cc.as_u64().and_then(|u| u16::try_from(u).ok()).map(LinkEvent::Consumer)
+    } else if is_true("dismiss") {
         Some(LinkEvent::Dismissed)
     } else if is_true("ready") {
         Some(LinkEvent::Rebooted)
@@ -112,11 +167,17 @@ pub fn probe_port(port: &str, timeout: Duration) -> PortProbe {
     }
 }
 
+/// Where the reader thread sends key events, once someone asked for them.
+type KeySink = Arc<Mutex<Option<Sender<LinkEvent>>>>;
+
 /// An open USB link.
 pub struct SerialLink {
     port: String,
     writes: Option<Sender<Vec<u8>>>,
     events: Receiver<LinkEvent>,
+    keys: KeySink,
+    /// Link replies taken out of `events` by `forward_keys`, for `try_event`.
+    held: Mutex<VecDeque<LinkEvent>>,
     alive: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
@@ -139,20 +200,38 @@ impl SerialLink {
         }
         let (wtx, wrx) = mpsc::channel::<Vec<u8>>();
         let (etx, erx) = mpsc::channel();
+        let keys: KeySink = Arc::default();
         let alive = Arc::new(AtomicBool::new(true));
         let stop = Arc::new(AtomicBool::new(false));
-        let (a, s, name) = (alive.clone(), stop.clone(), port.to_owned());
+        let (a, s, k, name) = (alive.clone(), stop.clone(), keys.clone(), port.to_owned());
         let thread = std::thread::Builder::new()
             .name("clawdmeter-usb".into())
             .spawn(move || {
-                run(sp, &name, wrx, etx, &s);
+                let forwarded = run(sp, &name, wrx, etx, &k, &s);
+                // Whatever the board held is up now: the sink never waits
+                // for a release that can't come.
+                if forwarded {
+                    if let Some(tx) = k.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+                        let _ = tx.send(LinkEvent::Keyboard(KeyboardReport::default()));
+                        let _ = tx.send(LinkEvent::Consumer(0));
+                    }
+                }
                 a.store(false, Ordering::SeqCst);
                 if let Some(h) = held {
                     let _ = std::fs::remove_file(h);
                 }
             })
             .map_err(|e| DeviceError::Serial(e.to_string()))?;
-        Ok(SerialLink { port: port.to_owned(), writes: Some(wtx), events: erx, alive, stop, thread: Some(thread) })
+        Ok(SerialLink {
+            port: port.to_owned(),
+            writes: Some(wtx),
+            events: erx,
+            keys,
+            held: Mutex::default(),
+            alive,
+            stop,
+            thread: Some(thread),
+        })
     }
 
     /// The port path.
@@ -177,8 +256,31 @@ impl SerialLink {
         }
     }
 
+    /// From now on, send the board's key events ([`LinkEvent::Keyboard`],
+    /// [`LinkEvent::Consumer`]) to `sink` as they arrive, instead of queueing
+    /// them for [`SerialLink::try_event`]. When the link ends, the sink gets
+    /// an all-keys-up report and a consumer release (if any key event came).
+    ///
+    /// Key events already queued go to `sink` first, so it gets them all in
+    /// order (the link thread queues and forwards under the same lock).
+    pub fn forward_keys(&self, sink: Sender<LinkEvent>) {
+        let mut guard = self.keys.lock().unwrap_or_else(|e| e.into_inner());
+        let mut held = self.held.lock().unwrap_or_else(|e| e.into_inner());
+        while let Ok(ev) = self.events.try_recv() {
+            if ev.is_key() {
+                let _ = sink.send(ev);
+            } else {
+                held.push_back(ev);
+            }
+        }
+        *guard = Some(sink);
+    }
+
     /// The next thing the board said, if any.
     pub fn try_event(&self) -> Option<LinkEvent> {
+        if let Some(ev) = self.held.lock().unwrap_or_else(|e| e.into_inner()).pop_front() {
+            return Some(ev);
+        }
         self.events.try_recv().ok()
     }
 
@@ -202,13 +304,16 @@ impl Drop for SerialLink {
     }
 }
 
+/// The link thread. True if it passed on any key event.
 fn run(
     mut sp: Box<dyn serialport::SerialPort>,
     port: &str,
     writes: Receiver<Vec<u8>>,
     events: Sender<LinkEvent>,
+    keys: &KeySink,
     stop: &AtomicBool,
-) {
+) -> bool {
+    let mut forwarded = false;
     let _ = sp.clear(serialport::ClearBuffer::Input);
     // A command half-typed by someone else ends here, so the first payload
     // starts on a fresh line.
@@ -242,19 +347,19 @@ fn run(
         if last_ping.elapsed() >= KEEPALIVE {
             last_ping = Instant::now();
             if !send(&mut sp, PING) {
-                return;
+                return forwarded;
             }
         }
         loop {
             match writes.try_recv() {
                 Ok(bytes) => {
                     if !send(&mut sp, &bytes) {
-                        return;
+                        return forwarded;
                     }
                     last_ping = Instant::now();
                 }
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => return,
+                Err(TryRecvError::Disconnected) => return forwarded,
             }
         }
         match sp.read(&mut buf) {
@@ -268,7 +373,18 @@ fn run(
                         if ev == LinkEvent::Rejected {
                             log::warn!("USB {port}: the board rejected a payload");
                         }
-                        let _ = events.send(ev);
+                        forwarded |= ev.is_key();
+                        // Under the sink's lock either way, so forward_keys
+                        // sees every key event queued before it took over.
+                        let sink = keys.lock().unwrap_or_else(|e| e.into_inner());
+                        match sink.as_ref() {
+                            Some(tx) if ev.is_key() => {
+                                let _ = tx.send(ev);
+                            }
+                            _ => {
+                                let _ = events.send(ev);
+                            }
+                        }
                     }
                 }
                 if acc.len() > MAX_LINE {
@@ -278,10 +394,11 @@ fn run(
             Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {}
             Err(e) => {
                 log::info!("USB {port}: read failed: {e}");
-                return;
+                return forwarded;
             }
         }
     }
+    forwarded
 }
 
 #[cfg(test)]
@@ -298,6 +415,33 @@ mod tests {
         assert_eq!(parse_line("{\"env\":\"x\",\"ver\":\"1\",\"usb\":1}"), None);
         assert_eq!(parse_line("{\"dismiss\":false}"), None);
         assert_eq!(parse_line("{not json"), None);
+    }
+
+    #[test]
+    fn reads_the_buttons_keys() {
+        let kb = |modifiers, keys| Some(LinkEvent::Keyboard(KeyboardReport { modifiers, keys }));
+        // Shift+Tab, then Space held, then everything up.
+        assert_eq!(parse_line("{\"kb\":\"022b0000000000\"}\r\n"), kb(0x02, [0x2B, 0, 0, 0, 0, 0]));
+        assert_eq!(parse_line("{\"kb\":\"002C0000000000\"}"), kb(0, [0x2C, 0, 0, 0, 0, 0]));
+        assert_eq!(parse_line("{\"kb\":\"0f0405060708ff\"}"), kb(0x0F, [4, 5, 6, 7, 8, 0xFF]));
+        let up = parse_line("{\"kb\":\"00000000000000\"}");
+        assert_eq!(up, kb(0, [0; 6]));
+        assert!(matches!(up, Some(LinkEvent::Keyboard(r)) if r.is_empty()));
+        // A log line cut into the front of it still parses (the reader takes
+        // the line from its first `{`).
+        assert_eq!(parse_line("BLE: adv{\"kb\":\"002c0000000000\"}"), kb(0, [0x2C, 0, 0, 0, 0, 0]));
+        // Media keys: a consumer usage down, then 0 = released.
+        assert_eq!(parse_line("{\"cc\":205}"), Some(LinkEvent::Consumer(0xCD)));
+        assert_eq!(parse_line("{\"cc\":0}"), Some(LinkEvent::Consumer(0)));
+        // Malformed: wrong length, not hex, not a string, out of range.
+        assert_eq!(parse_line("{\"kb\":\"002c00000000\"}"), None);
+        assert_eq!(parse_line("{\"kb\":\"00 2c0000000000\"}"), None);
+        assert_eq!(parse_line("{\"kb\":\"zz2c0000000000\"}"), None);
+        assert_eq!(parse_line("{\"kb\":44}"), None);
+        assert_eq!(parse_line("{\"cc\":70000}"), None);
+        assert_eq!(parse_line("{\"cc\":-1}"), None);
+        assert_eq!(parse_line("{\"cc\":\"205\"}"), None);
+        assert!(LinkEvent::Consumer(0).is_key() && !LinkEvent::Dismissed.is_key());
     }
 
     #[test]

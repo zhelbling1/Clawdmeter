@@ -30,6 +30,7 @@
 #include "hal/touch_hal.h"
 #include "hal/input_hal.h"
 #include "button_action.h"
+#include "key_route.h"   // USB keys: BLE HID or the USB serial link
 #include "hal/power_hal.h"
 #include "hal/imu_hal.h"
 #include "pet.h"
@@ -462,7 +463,7 @@ static KeyboardHeld kb_held = {};
 static void kb_send(uint8_t extra_mods, uint8_t extra_key) {
     uint8_t report[8];
     keyboard_report(&kb_held, extra_mods, extra_key, report);
-    ble_keyboard_report(report);
+    key_route_keyboard(report);   // USB keys: was ble_keyboard_report()
 }
 
 static void button_run_press(ButtonSlot slot, ButtonRun* r, int32_t action, bool can_hold) {
@@ -483,8 +484,8 @@ static void button_run_press(ButtonSlot slot, ButtonRun* r, int32_t action, bool
         }
         break;
     case BTN_KIND_CONSUMER:
-        ble_consumer_press(b.consumer);
-        ble_consumer_release();
+        key_route_consumer_press(b.consumer);   // USB keys: was ble_consumer_*()
+        key_route_consumer_release();
         if (b.repeat && can_hold) {
             r->repeat_usage = b.consumer;
             r->next_repeat_ms = millis() + BTN_REPEAT_DELAY_MS;
@@ -503,8 +504,8 @@ static void button_run_press(ButtonSlot slot, ButtonRun* r, int32_t action, bool
 
 static void button_run_tick(ButtonRun* r) {
     if (!r->repeat_usage || (int32_t)(millis() - r->next_repeat_ms) < 0) return;
-    ble_consumer_press(r->repeat_usage);
-    ble_consumer_release();
+    key_route_consumer_press(r->repeat_usage);   // USB keys: was ble_consumer_*()
+    key_route_consumer_release();
     r->next_repeat_ms = millis() + BTN_REPEAT_INTERVAL_MS;
 }
 
@@ -524,6 +525,7 @@ void loop() {
     lv_timer_handler();
     ui_tick_anim();
     ble_tick();
+    key_route_tick();   // USB keys: resend a held report over USB
     power_hal_tick();
     imu_hal_tick();
     sound_hal_tick();
