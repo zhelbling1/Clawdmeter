@@ -71,7 +71,8 @@ pub struct AccountError {
 pub struct StatusSnapshot {
     /// Unix seconds this snapshot was written.
     pub updated_at: i64,
-    /// `connected` | `connecting` | `searching` | `no_adapter` | `starting`.
+    /// `connected` | `connecting` | `searching` | `usb_searching` (Bluetooth
+    /// off, no board on USB) | `no_adapter` | `starting`.
     pub link: String,
     /// Device address / id when connected.
     pub device_key: Option<String>,
@@ -146,6 +147,7 @@ impl StatusSnapshot {
         let (link, device_key, device_name, link_detail) = match &s.link {
             LinkState::Starting => ("starting", None, None, None),
             LinkState::NoAdapter(e) => ("no_adapter", None, None, Some(e.clone())),
+            LinkState::UsbSearching => ("usb_searching", None, None, None),
             LinkState::Searching => ("searching", None, None, None),
             LinkState::Connecting => ("connecting", None, None, None),
             LinkState::Connected { key, name } => ("connected", Some(key.clone()), name.clone(), None),

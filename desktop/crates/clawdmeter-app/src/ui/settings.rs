@@ -574,6 +574,7 @@ impl SettingsView {
                 "connected" => (Tone::Ok, "Bluetooth connected".into()),
                 "no_adapter" => (Tone::Bad, "Bluetooth unavailable".into()),
                 "connecting" => (Tone::Accent, "Connecting…".into()),
+                "usb_searching" => (Tone::Plain, "Looking for Clawdmeter on USB".into()),
                 _ => (Tone::Plain, "Looking for Clawdmeter".into()),
             },
         };
@@ -584,10 +585,8 @@ impl SettingsView {
             (None, _) => "USB not connected".into(),
         };
         let firmware: SharedString = match (&ver, &update) {
-            (Some(v), Some(u)) => {
-                format!("Firmware v{} · v{} available", v.trim_start_matches('v'), u.trim_start_matches('v')).into()
-            }
-            (Some(v), None) => format!("Firmware v{}", v.trim_start_matches('v')).into(),
+            (Some(v), Some(u)) => format!("Firmware {} · {} available", version_label(v), version_label(u)).into(),
+            (Some(v), None) => format!("Firmware {}", version_label(v)).into(),
             (None, _) => "Firmware version unknown".into(),
         };
         let art = div().flex().flex_shrink_0().items_center().justify_center().size(px(150.)).child(match board {
@@ -1801,6 +1800,19 @@ impl SettingsView {
                 });
             }),
         ));
+        let me = cx.entity().downgrade();
+        let bluetooth = self.settings.bluetooth;
+        pane = pane.child(field(
+            t,
+            "Use Bluetooth",
+            if bluetooth { "USB first; Bluetooth when no board is on USB." } else { "USB only." },
+            toggle(t, "bluetooth", bluetooth, true, move |_, _, cx| {
+                let _ = me.update(cx, |v, cx| {
+                    v.save(|s, _| s.bluetooth = !bluetooth);
+                    cx.notify();
+                });
+            }),
+        ));
         if let (Some(old), Some(exe)) = (self.autostart_stale.clone(), self.launch_exe.clone()) {
             let text = match old {
                 Some(o) if clawdmeter_core::launch::unstable(&o).is_some() => format!(
@@ -2021,6 +2033,17 @@ const CONFIG_TEMPLATE: &str = "\
 ";
 
 /// Open the config file in the system editor, creating it first if needed.
+/// A firmware version as shown: `v1.2.3`, or `dev build` for a local build
+/// whose version isn't a number (`dev`).
+pub(super) fn version_label(v: &str) -> String {
+    let n = v.trim().trim_start_matches('v');
+    if n.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("v{n}")
+    } else {
+        "dev build".into()
+    }
+}
+
 fn open_config(path: &std::path::Path, cx: &mut gpui::App) {
     if !path.exists() {
         let made =
@@ -2648,6 +2671,29 @@ mod tests {
         cx.simulate_keystrokes("c");
         assert!(config().contains("button_secondary = c hold\n"), "{}", config());
         let _ = std::fs::remove_dir_all(&paths.home);
+    }
+
+    #[gpui::test]
+    fn bluetooth_toggle_writes_the_config(cx: &mut TestAppContext) {
+        let paths = home("bluetooth");
+        let p = paths.clone();
+        let (view, cx) = cx.add_window_view(move |_, cx| SettingsView::with_usb(p, Page::Settings, false, cx));
+        cx.simulate_resize(gpui::size(px(1600.), px(1600.)));
+        view.read_with(cx, |v, _| assert!(v.settings.bluetooth, "on by default"));
+        click(cx, "bluetooth");
+        assert!(std::fs::read_to_string(&paths.config_file).unwrap().contains("bluetooth = off"));
+        view.read_with(cx, |v, _| assert!(!v.settings.bluetooth));
+        click(cx, "bluetooth");
+        assert!(std::fs::read_to_string(&paths.config_file).unwrap().contains("bluetooth = on"));
+        let _ = std::fs::remove_dir_all(&paths.home);
+    }
+
+    #[test]
+    fn firmware_versions_read_as_numbers_or_dev_builds() {
+        assert_eq!(version_label("2.3.3"), "v2.3.3");
+        assert_eq!(version_label("v2.3.3"), "v2.3.3");
+        assert_eq!(version_label("dev"), "dev build");
+        assert_eq!(version_label("vdev"), "dev build");
     }
 
     #[cfg(target_os = "linux")]

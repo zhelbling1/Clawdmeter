@@ -117,6 +117,13 @@ impl Items {
         let mut label = state.label().to_owned();
         if snap.link == "no_adapter" {
             label = "Bluetooth unavailable".into();
+        } else if snap.link == "usb_searching" && state == TrayState::Searching {
+            label = "Looking for Clawdmeter on USB".into();
+        } else if snap.link == "connected"
+            && state == TrayState::Connected
+            && snap.device_key.as_deref().is_some_and(|k| k.starts_with("usb:"))
+        {
+            label = "Connected over USB".into();
         }
         self.status.set_text(format!("Clawdmeter · {label}"));
         let account = snap.account.as_deref().map(|a| tilde(a, &paths.home));

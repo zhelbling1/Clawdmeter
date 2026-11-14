@@ -96,10 +96,17 @@ The board can get its data over the USB cable instead of Bluetooth.
    when it finds one. The status shows **Clawdmeter (USB)** as connected.
 
 Pairing is optional. The meters, Clawd, alerts and chimes work over USB
-alone. The buttons send their key presses over Bluetooth only, so they type
-nothing until the board is also paired. If both links are up, data goes over
-USB and the Bluetooth link stays connected for the buttons. If the cable
-is pulled, data goes back to Bluetooth.
+alone. The buttons send their key presses through your computer's own
+Bluetooth pairing, so they type nothing until the board is also paired there
+(the app doesn't need its Bluetooth link for that). The app tries USB first:
+at start-up it looks for a board on USB before it tries Bluetooth, and while
+a USB link is up it keeps its own Bluetooth link closed. If the cable is
+pulled, or no board is on USB, data goes over Bluetooth.
+
+To never use Bluetooth, turn off **Use Bluetooth** in **Settings** (`bluetooth
+= off` in the config). The app then looks for the board on USB only, shows
+**Looking for Clawdmeter on USB** while it finds none, and doesn't touch the
+Bluetooth adapter. The setting takes effect at once, without a restart.
 
 If a board is paired over Bluetooth, the app uses a USB board only when it
 is that same board. A second board plugged in to charge is left alone and

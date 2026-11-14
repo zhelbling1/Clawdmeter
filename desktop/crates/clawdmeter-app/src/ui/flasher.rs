@@ -49,12 +49,7 @@ impl Source {
         }
     }
     fn version(&self) -> String {
-        let v = &self.manifest().version;
-        if v.starts_with('v') {
-            v.clone()
-        } else {
-            format!("v{v}")
-        }
+        super::settings::version_label(&self.manifest().version)
     }
 }
 

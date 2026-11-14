@@ -77,6 +77,9 @@ is faked behind `FlashHardware`.
   keys are read when these are absent), `desktop_chime` (the same ding on
   this computer via rodio, ALSA on Linux), `clock`, `liveliness` (1–5,
   default 3: the Device page's Animation silliness slider, sent as `lv`),
+  `bluetooth` (`on`, the default, or `off`; unknown reads as `on`: off = USB
+  only, no `Bluetooth` handle, watcher or connect task; the status reads
+  `usb_searching` while no board is open),
   `attention_anim` (`off`/`10s`/`30s`/`2m`, default `2m`, sent as `aa`
   seconds), `pace_marker` (default off, sent as `pm`), `button_primary`
   (default `space`), `button_secondary` (default `shift-tab`) and
@@ -238,8 +241,12 @@ Per account (`probe.rs`, `oauth.rs`):
   asked again after 5 min; a port that didn't answer or couldn't be opened,
   after 20 s. The backoff is forgotten when the window claims the port. Scans
   skip ports waiting out a retry. While a link is
-  open every write goes over USB instead of BLE; BLE stays connected for the
-  buttons. If the link drops, writes go back to BLE. The engine resends with
+  open every write goes over USB instead of BLE, and the daemon keeps BLE
+  closed (USB first: `daemon::ble_allowed(setting, usb_open,
+  first_scan_done)`; at start-up the first scan runs before any BLE connect,
+  unless USB is off or the window holds the port; the buttons use Windows' own
+  HID pairing, not the app's link). If the link drops, BLE connects again and
+  writes go back to it. The engine resends with
   `Engine::resend_all(lost)` (all settings and the numbers, alert state kept;
   `lost = true` also re-sends an alert that is up, silently: no `b`, via
   `AttentionState::resend` / `quiet`): `false` when the window takes the

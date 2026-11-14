@@ -128,6 +128,14 @@ fn close_usb(l: SerialLink) {
     tokio::task::spawn_blocking(move || l.close());
 }
 
+/// Whether the Bluetooth data link may run: the setting is on, no USB link is
+/// open (USB carries the data; the buttons use Windows' own pairing), and the
+/// first USB scan is over (USB first). `first_usb_scan_done` also covers USB
+/// being off or the window holding the port.
+pub fn ble_allowed(setting_on: bool, usb_link_open: bool, first_usb_scan_done: bool) -> bool {
+    setting_on && !usb_link_open && first_usb_scan_done
+}
+
 /// Requests from the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
@@ -150,9 +158,11 @@ pub enum Command {
 /// The BLE side, for the tray's status dot.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum LinkState {
-    /// Not tried yet.
+    /// Not tried yet (or Bluetooth is waiting for the USB scan).
     #[default]
     Starting,
+    /// Bluetooth is off in the settings and no board is open on USB.
+    UsbSearching,
     /// No adapter, or Bluetooth is off.
     NoAdapter(String),
     /// No paired device found; retrying.
@@ -291,10 +301,12 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
     let mut device_events: Option<DeviceEvents> = None;
     let mut connecting: Option<JoinHandle<ConnectResult>> = None;
     let mut polling: Option<JoinHandle<PollResults>> = None;
-    let mut link_state = LinkState::Starting;
     let mut reconnect = Reconnect::default();
-    let bt = Bluetooth::default();
-    let mut wakeups = clawdmeter_ble::spawn_watcher(bt.clone());
+    // The Bluetooth handle and its watcher exist only while Bluetooth is
+    // allowed (setting on, and the USB-first rules): with it off, or while a
+    // USB link carries the data, nothing touches the adapter.
+    let mut bt: Option<Bluetooth> = None;
+    let mut wakeups: Option<clawdmeter_ble::Wakeups> = None;
     let mut last_settings = unix_now();
     let mut last_link_check = unix_now();
     let mut last_write_at = None;
@@ -305,6 +317,8 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
     let mut usb: Option<SerialLink> = None;
     let mut usb_scan: Option<JoinHandle<UsbScan>> = None;
     let mut last_usb_scan = i64::MIN / 2;
+    // The first USB scan has finished: Bluetooth waits for it (USB first).
+    let mut first_usb_scan_done = false;
     // Ports turned down by a scan, and when to ask them again.
     let mut usb_retry: HashMap<String, i64> = HashMap::new();
     // A held marker left by a crashed run would make the window wait.
@@ -312,6 +326,10 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
     if !usb_on {
         log::info!("USB link off (CLAWDMETER_USB=0)");
     }
+    if !engine.settings().bluetooth {
+        log::info!("Bluetooth off in the settings; USB only");
+    }
+    let mut link_state = if engine.settings().bluetooth { LinkState::Starting } else { LinkState::UsbSearching };
     let mut ticker = tokio::time::interval(TICK);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -440,74 +458,6 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
             }
         }
 
-        // ---- link ----
-        if connecting.as_ref().is_some_and(JoinHandle::is_finished) {
-            match connecting.take().expect("checked").await {
-                Ok(Ok((l, rx))) => {
-                    log::info!("connected to {} ({})", l.name().unwrap_or("device"), l.key());
-                    link_state = LinkState::Connected { key: l.key().to_owned(), name: l.name().map(str::to_owned) };
-                    link = Some(l);
-                    device_events = Some(rx);
-                    reconnect.connected();
-                    // While USB carries the data, BLE is only the buttons:
-                    // the device's state (alert included) is unchanged, so
-                    // there is nothing to start over or resend.
-                    if usb.is_none() {
-                        inbox.reset();
-                        engine.on_connected();
-                    }
-                }
-                Ok(Err(e)) => {
-                    link_state = match &e {
-                        LinkError::NoAdapter(s) => LinkState::NoAdapter(s.clone()),
-                        _ => LinkState::Searching,
-                    };
-                    let wait = reconnect.failed(now);
-                    if !matches!(e, LinkError::NotFound) || wait == 1 {
-                        log::info!("{e}; retrying in {wait}s");
-                    }
-                }
-                Err(e) => log::error!("connect task failed: {e}"),
-            }
-        }
-        // The OS saw the device come back (BlueZ reconnected the bonded
-        // device, or a scan saw it advertise): don't sit out the wait.
-        while let Ok(w) = wakeups.try_recv() {
-            if link.is_some() || !should_wake(&w, cache.load().as_deref()) {
-                continue;
-            }
-            if connecting.is_none() && !reconnect.due(now) {
-                let how = match w.sighting {
-                    Sighting::Connected => "connected at the OS level",
-                    Sighting::Advertising => "advertising",
-                };
-                log::info!("device {} {how}; reconnecting now", w.key);
-            }
-            reconnect.wake(now, connecting.is_some());
-        }
-        if link.is_none() && connecting.is_none() && reconnect.due(now) {
-            if link_state == LinkState::Starting {
-                link_state = LinkState::Connecting;
-            }
-            let (bt, cache, opts) = (bt.clone(), cache.clone(), link_opts.clone());
-            connecting = Some(tokio::spawn(async move {
-                let adapter = bt.adapter().await?;
-                DeviceLink::open(&adapter, &cache, &opts).await
-            }));
-        }
-        if let Some(l) = &link {
-            if now - last_link_check >= LINK_CHECK_EVERY {
-                last_link_check = now;
-                if !l.is_connected().await {
-                    log::info!("device disconnected, reconnecting...");
-                    link = None;
-                    device_events = None;
-                    link_state = LinkState::Searching;
-                    reconnect.retry_in(now, 2);
-                }
-            }
-        }
-
         // ---- USB link ----
         // Handing the board between links keeps the alert state
         // (`resend_all`); only a real BLE reconnect starts it over.
@@ -546,6 +496,7 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
             }
         }
         if usb_scan.as_ref().is_some_and(JoinHandle::is_finished) {
+            first_usb_scan_done = true;
             if let Ok(scan) = usb_scan.take().expect("checked").await {
                 usb_retry.extend(scan.retry);
                 if let Some(u) = scan.link {
@@ -565,6 +516,115 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
             last_usb_scan = now;
             let (p, skip, paired) = (paths.clone(), usb_retry.clone(), cache.load());
             usb_scan = Some(tokio::task::spawn_blocking(move || scan_usb(p, skip, paired, now)));
+        }
+
+        // ---- link (Bluetooth) ----
+        // USB first: the first scan has run (or USB is off, or the window
+        // holds the port), and no USB link is open.
+        let bluetooth_on = engine.settings().bluetooth;
+        let ble_ok = ble_allowed(bluetooth_on, usb.is_some(), !usb_on || first_usb_scan_done || claimed);
+        if !ble_ok {
+            if let Some(l) = link.take() {
+                if bluetooth_on {
+                    log::info!("USB link up; Bluetooth not needed");
+                } else {
+                    log::info!("Bluetooth off in the settings; closing the link");
+                }
+                l.close().await;
+                device_events = None;
+                // A prompt first try once Bluetooth may connect again.
+                reconnect.retry_in(now, 0);
+            }
+            if !bluetooth_on {
+                // Nothing of Bluetooth stays running (a connect in flight
+                // finishes, and its link is closed below).
+                if connecting.is_none() {
+                    bt = None;
+                }
+                wakeups = None;
+                link_state = LinkState::UsbSearching;
+            } else if link_state != LinkState::Starting {
+                link_state = LinkState::Starting;
+            }
+        } else if link_state == LinkState::UsbSearching {
+            link_state = LinkState::Starting;
+        }
+        if ble_ok && bt.is_none() {
+            let handle = Bluetooth::default();
+            wakeups = Some(clawdmeter_ble::spawn_watcher(handle.clone()));
+            bt = Some(handle);
+        }
+        if connecting.as_ref().is_some_and(JoinHandle::is_finished) {
+            match connecting.take().expect("checked").await {
+                Ok(Ok((l, _))) if !ble_ok => {
+                    // USB came up (or Bluetooth went off) while it connected.
+                    log::info!("Bluetooth not needed; closing the link");
+                    l.close().await;
+                }
+                Ok(Err(_)) if !ble_ok => {}
+                Ok(Ok((l, rx))) => {
+                    log::info!("connected to {} ({})", l.name().unwrap_or("device"), l.key());
+                    link_state = LinkState::Connected { key: l.key().to_owned(), name: l.name().map(str::to_owned) };
+                    link = Some(l);
+                    device_events = Some(rx);
+                    reconnect.connected();
+                    // While USB carries the data, BLE is only the buttons:
+                    // the device's state (alert included) is unchanged, so
+                    // there is nothing to start over or resend.
+                    if usb.is_none() {
+                        inbox.reset();
+                        engine.on_connected();
+                    }
+                }
+                Ok(Err(e)) => {
+                    link_state = match &e {
+                        LinkError::NoAdapter(s) => LinkState::NoAdapter(s.clone()),
+                        _ => LinkState::Searching,
+                    };
+                    let wait = reconnect.failed(now);
+                    if !matches!(e, LinkError::NotFound) || wait == 1 {
+                        log::info!("{e}; retrying in {wait}s");
+                    }
+                }
+                Err(e) => log::error!("connect task failed: {e}"),
+            }
+        }
+        // The OS saw the device come back (BlueZ reconnected the bonded
+        // device, or a scan saw it advertise): don't sit out the wait.
+        while let Some(w) = wakeups.as_mut().and_then(|w| w.try_recv().ok()) {
+            if !ble_ok || link.is_some() || !should_wake(&w, cache.load().as_deref()) {
+                continue;
+            }
+            if connecting.is_none() && !reconnect.due(now) {
+                let how = match w.sighting {
+                    Sighting::Connected => "connected at the OS level",
+                    Sighting::Advertising => "advertising",
+                };
+                log::info!("device {} {how}; reconnecting now", w.key);
+            }
+            reconnect.wake(now, connecting.is_some());
+        }
+        if let (true, Some(bt), None, true) = (ble_ok && link.is_none(), &bt, &connecting, reconnect.due(now)) {
+            if link_state == LinkState::Starting {
+                link_state = LinkState::Connecting;
+            }
+            let (bt, cache, opts) = (bt.clone(), cache.clone(), link_opts.clone());
+            connecting = Some(tokio::spawn(async move {
+                let adapter = bt.adapter().await?;
+                DeviceLink::open(&adapter, &cache, &opts).await
+            }));
+        }
+        if let Some(l) = &link {
+            if now - last_link_check >= LINK_CHECK_EVERY {
+                last_link_check = now;
+                if !l.is_connected().await {
+                    log::info!("device disconnected, reconnecting...");
+                    link = None;
+                    device_events = None;
+                    link_state = LinkState::Searching;
+                    reconnect.retry_in(now, 2);
+                }
+            }
         }
 
         // ---- write ----
@@ -688,5 +748,24 @@ pub fn once(paths: &Paths) -> i32 {
         0
     } else {
         1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ble_allowed;
+
+    #[test]
+    fn bluetooth_waits_for_usb() {
+        // (setting, usb open, first scan done) -> allowed
+        assert!(!ble_allowed(true, false, false), "USB first: wait for the first scan");
+        assert!(ble_allowed(true, false, true), "no board on USB: Bluetooth may connect");
+        assert!(!ble_allowed(true, true, true), "a USB link carries the data");
+        assert!(!ble_allowed(true, true, false));
+        for usb in [false, true] {
+            for scanned in [false, true] {
+                assert!(!ble_allowed(false, usb, scanned), "off means off");
+            }
+        }
     }
 }
