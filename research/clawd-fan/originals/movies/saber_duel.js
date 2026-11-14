@@ -6,11 +6,18 @@
  * a black helmet-mask and cape with a red blade. Caricature only: no
  * likeness, no logos, no lines from the film.
  *
+ * Staging: the two Clawds hold the far ends of the stage and fight with
+ * their sword arms raised, so the middle stays open and every clash
+ * happens there, in clear black space. The villain's sword arm is a steel
+ * gauntlet with a dark gap around it, so it reads in front of his helmet.
+ *
  * Story: idle → poof (shaggy hair, fatigues, a hilt) → he sidesteps left; a
- * dark puff on the right leaves an armoured Clawd in a cape → red blade,
- * then blue blade → loop: clash, parry, clash, parry, sparks → they part;
- * the villain lowers his blade and reaches out... "..." (nothing more) →
- * the hero bows → poof → idle.
+ * dark puff on the right leaves an armoured Clawd in a cape → the red blade
+ * hisses up, then the blue one → loop: on guard; the villain lunges and the
+ * blades meet high in the middle; the hero thrusts and is parried low; the
+ * blades lock overhead; back on guard → they part; the villain lowers his
+ * blade and reaches out... "..." (nothing more) → the hero bows → poof →
+ * idle.
  *
  * Usage: node movies/saber_duel.js [--fast] [--no-preview]
  */
@@ -38,65 +45,80 @@ function heroCostume(g, P) {
 }
 
 // Villain: all-black armour, flared helmet with lenses and a breathing
-// grille, a chest box with lights, a belt, and a cape behind.
+// grille, a chest box with lights, a belt, and a cape behind. His arms are
+// gauntlets (slate, steel at the hand), painted after the helmet so they
+// stay in front of it; a raised arm gets a one-cell dark gap cut into the
+// helmet dome on either side, so it reads against the black.
 function villainCostume({ wind = 0, phase = 0, breath = false } = {}) {
   return {
     under: (g, P) => k.cape(g, P, { c: C.charcoal, lining: C.maroon, wind, phase }),
     over: (g, P) => {
       k.recolour(g, P, () => true, C.charcoal, C.charcoal, { eyes: true });
       const m = k.midCol(P);
-      // Armour sheen down the chest and on the shoulders.
+      // Armour sheen across the chest, a belt with a buckle.
       k.recolour(g, P, (x, y) => y === P.chin && Math.abs(x - m - 0.5) <= 6.5, C.slate, C.slate);
-      const [hx0, hx1] = k.headSpan(P);
-      k.recolour(g, P, (x) => x < hx0 || x > hx1, C.slate, C.slate);            // gauntlets
-      k.recolour(g, P, (x, y) => y === P.waist, C.slate, C.slate);                // belt
+      k.recolour(g, P, (x, y) => y === P.waist, C.slate, C.slate);
       k.onBody(g, P, m, P.waist, C.steel); k.onBody(g, P, m + 1, P.waist, C.steel);
       // Chest box: three lights.
       rect(g, m - 2, P.chin + 2, m + 3, P.chin + 3, C.slate);
       put(g, m - 1, P.chin + 2, C.red); put(g, m + 1, P.chin + 2, C.blue); put(g, m + 2, P.chin + 3, C.glow);
       k.villainHelmet(g, P, { c: C.charcoal, sheen: C.slate, lens: C.gray, grille: C.steel });
-      // Red glint in the lenses.
-      for (const e of P.eyes) put(g, e.x, P.eyeY, C.red);
-      // A raised arm stays in front of the helmet.
-      const arm = new Set(P.cells.filter(c => c[1] < P.head.top).map(c => c[0] + ',' + c[1]));
-      for (const key of arm) { const [x, y] = key.split(',').map(Number); put(g, x, y, C.slate); }
+      for (const e of P.eyes) put(g, e.x, P.eyeY, C.red);               // red glint in the lenses
+      // Arms in front of the helmet.
+      const [hx0, hx1] = k.headSpan(P), top = P.head.top;
+      const raised = P.cells.filter(([, y]) => y < top);
+      for (const [x, y] of raised) {                                    // gap in the dome
+        for (const u of [-1, 1]) if (!P.at(x + u, y)) put(g, x + u, y, null);
+      }
+      const armTop = raised.length ? Math.min(...raised.map(c => c[1])) : 0;
+      for (const [x, y] of raised) put(g, x, y, y <= armTop + 1 ? C.steel : C.slate);
+      for (const [x, y] of P.cells) {
+        if (y < top || y >= P.legTop || (x >= hx0 && x <= hx1)) continue;
+        const tip = x < hx0 ? x <= P.handL?.x + 1 : x >= P.handR?.x - 1;
+        put(g, x, y, tip ? C.steel : C.slate);
+      }
       if (breath) {                                       // steam from the vent
         const [x0, x1] = k.headSpan(P), f = P.facing === 'left' ? -1 : 1;
         const bx = f < 0 ? x0 - 4 : x1 + 4;
-        put(g, bx, P.eyeY + 1, C.gray); put(g, bx + f, P.eyeY, C.gray); put(g, bx + 2 * f, P.eyeY - 1, C.gray);
+        put(g, bx, P.eyeY + 3, C.gray); put(g, bx + f, P.eyeY + 2, C.gray); put(g, bx + 2 * f, P.eyeY + 3, C.gray);
       }
     },
   };
 }
 
-// The sword grip: the tip of a side arm, or the top of a raised hand.
+// The sword grip: the top of a raised hand, or the tip of a side arm.
 const grip = (h) => h.dir === 'up' ? [Math.round(h.x), h.y] : [h.x, h.y0];
+const swordHand = (P, side) => side === 'R' ? P.handR : P.handL;
+// The angle from a grip to a point (for aiming blades at a clash point).
+const aim = (from, to) => Math.atan2(to[1] - from[1], to[0] - from[0]) * 180 / Math.PI;
 
-function hero(g, pose, { blade = null, eyes = null, dx = HX, flip = false } = {}) {
-  return k.clawd(g, pose, { dx, flip, eyes, over: [heroCostume, (g2, P) => {
-    if (!blade) return;
-    m2.saber(g2, ...grip(P.handR), blade[0], blade[1], BLUE);
-  }] });
+// blade: [deg, len] or { at: [x, y], over } (aim at a point, overshoot it).
+// hum 0/1 jitters the tip a cell, the blade's flicker.
+function drawBlade(g, P, side, blade, style, hum) {
+  if (!blade) return null;
+  const h = grip(swordHand(P, side));
+  let deg, len;
+  if (Array.isArray(blade)) [deg, len] = blade;
+  else { deg = aim(h, blade.at); len = Math.round(Math.hypot(blade.at[0] - h[0], blade.at[1] - h[1])) + (blade.over ?? 2) - 1; }
+  if (len) len += hum ? 1 : 0;
+  m2.saber(g, h[0], h[1], deg, len, style);
+  return { h, deg, len };
 }
-function villain(g, pose, { blade = null, dx = VX, wind = 0, phase = 0, breath = false, hand = 'R' } = {}) {
+
+function hero(g, pose, { blade = null, eyes = null, dx = HX, hum = 0 } = {}) {
+  return k.clawd(g, pose, { dx, eyes, over: [heroCostume, (g2, P) => drawBlade(g2, P, 'R', blade, BLUE, hum)] });
+}
+function villain(g, pose, { blade = null, dx = VX, wind = 0, phase = 0, breath = false, hand = 'L', hum = 0 } = {}) {
   const v = villainCostume({ wind, phase, breath });
-  return k.clawd(g, pose, { dx, flip: true, under: v.under, over: [v.over, (g2, P) => {
-    if (!blade) return;
-    const h = hand === 'R' ? P.handL : P.handR;        // flipped: his sword hand is on screen left
-    m2.saber(g2, ...grip(h), blade[0], blade[1], RED);
-  }] });
+  // Flipped, his sword hand is the screen-left one.
+  return k.clawd(g, pose, { dx, flip: true, under: v.under, over: [v.over, (g2, P) => drawBlade(g2, P, hand, blade, RED, hum)] });
 }
-
-// Where two blades cross (for the spark): segment intersection.
-function cross(a, b) {
-  const [x1, y1, x2, y2] = a, [x3, y3, x4, y4] = b;
-  const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d;
-  return [Math.round(x1 + t * (x2 - x1)), Math.round(y1 + t * (y2 - y1))];
-}
-const seg = (x, y, deg, len) => [x, y, x + Math.cos(deg * Math.PI / 180) * (len + 2), y + Math.sin(deg * Math.PI / 180) * (len + 2)];
 
 // ── Storyboard ───────────────────────────────────────────────────────────────
+
+// Positions (dx HX / VX): the hero's raised sword hand is at x 17-19 (his
+// body ends at x 20); the villain's side sword hand at x 25-28 (body from
+// x 33). Every clash point sits between them, in the open.
 
 const P0 = k.place('idle');
 m2.idleIntro(sc);
@@ -106,55 +128,59 @@ m2.poofSwap(sc, g => k.clawd(g, 'idle'), g => hero(g, 'idle', { dx: 0 }),
   [[P0.centre.x, P0.centre.y - 3]]);
 
 // Sidestep left (crab), clearing the stage.
-[[-7, 'crab_2'], [HX, 'crab_6']].forEach(([dx, p]) =>
-  sc.frame(130, g => hero(g, p, { dx })));
+sc.frame(200, g => hero(g, 'crab_2', { dx: -7 }));
 
 // A dark puff on the right: the villain.
 const VP = k.place('turn', { dx: VX, flip: true });
 const dark = { c: C.slate, edge: C.charcoal };
 [1, 3].forEach((ph, i) => sc.frame([180, 130][i], g => {
-  hero(g, 'turn', { eyes: 'wide' });
+  hero(g, 'idle', { eyes: 'wide' });
   if (ph > 1) villain(g, 'turn', { wind: 1 });
   k.poof(g, VP.centre.x, VP.centre.y - 3, ph, dark);
 }));
-// Red blade hisses out, then the blue one.
-sc.frame(520, g => { hero(g, 'turn', { eyes: 'wide' }); villain(g, 'turn', { blade: [-100, 12], breath: true }); });
-sc.frame(400, g => { hero(g, 'turn', { blade: [-80, 12] }); villain(g, 'turn', { blade: [-100, 12] }); });
+// The red blade hisses up, then the blue one answers overhead.
+const UP_H = [-90, 7], UP_V = [-90, 10];
+sc.frame(520, g => { hero(g, 'idle', { eyes: 'wide' }); villain(g, 'turn', { blade: UP_V, breath: true }); });
+sc.frame(400, g => { hero(g, 'wave_2', { blade: UP_H }); villain(g, 'turn', { blade: UP_V, hum: 1 }); });
 
-// Loop: clash, parry, clash, parry.
-const L = 13;                          // blade length in the fight
-const moves = [
-  // [hero pose, hero blade, villain pose, villain blade, hero eyes]
-  ['turn', [-60, L], 'wave_2', [165, L], 'wide'],      // he chops down, hero blocks
-  ['turn', [-85, L], 'turn', [-95, L], null],          // apart, on guard
-  ['wave_2', [15, L], 'turn', [-120, L], null],        // hero chops, he blocks
-  ['wave_2', [-30, L], 'wave_2', [-150, L], 'wide'],   // blades locked overhead
-];
+// Loop: guard; his lunge, blocked high; the hero winds up and leaps in;
+// blades locked overhead; they spring apart. Guards are straight up and the
+// strikes are at 45 degrees, the angles where a pixel blade stays clean.
 sc.loopStart();
-moves.forEach(([hp, hb, vp, vb, he], i) => sc.frame(i % 2 ? 190 : 150, g => {
-  const Ph = hero(g, hp, { blade: hb, eyes: he });
-  const Pv = villain(g, vp, { blade: vb, wind: 1 + (i % 2), phase: i, breath: i === 3 });
-  const a = seg(...grip(Ph.handR), hb[0], hb[1]), b = seg(...grip(Pv.handL), vb[0], vb[1]);
-  const [cx, cy] = cross(a, b);
-  if (i !== 1) m2.clash(g, cx, cy, i === 3 ? 0 : 1);
-  else { put(g, 26, 14, C.glow); put(g, 27, 17, C.glow); }
+const beats = [
+  // ms, hero, villain, clash [x, y, phase] or null
+  [200, { pose: 'wave_2', blade: [-90, 7] },
+        { pose: 'turn', blade: [-90, 10], breath: true }, null],
+  [150, { pose: 'wave_1', blade: [-45, 8], eyes: 'wide', hum: 1 },
+        { pose: 'point', blade: [-90, 11], dx: VX - 1, wind: 2, phase: 1 }, [24, 12, 0]],
+  [150, { pose: 'wave_3', blade: [-135, 7] },
+        { pose: 'turn', blade: [-90, 10], phase: 2, hum: 1 }, null],
+  [260, { pose: 'wave_reach', blade: [-45, 7], dx: HX + 1, hum: 1 },
+        { pose: 'point_1', blade: [-90, 12], wind: 2, phase: 3, breath: true }, [26, 12, 0]],
+  [170, { pose: 'wave_2', blade: [-90, 7], eyes: 'wide', hum: 1 },
+        { pose: 'turn', blade: [-90, 10], hum: 1, wind: 1, phase: 0 }, [26, 12, 2]],
+];
+beats.forEach(([ms, h, v, cl]) => sc.frame(ms, g => {
+  hero(g, h.pose, h);
+  villain(g, v.pose, v);
+  if (cl && cl[2] < 2) m2.clash(g, cl[0], cl[1], cl[2]);
+  else if (cl) for (const [u, w] of [[-3, -2], [3, -3], [-2, 3], [4, 1]]) put(g, cl[0] + u, cl[1] + w, C.glow);
 }));
 sc.loopEnd();
 
-// They part. The villain lowers his blade, reaches out... nothing more.
-sc.frame(260, g => { hero(g, 'turn', { blade: [-80, 12], eyes: 'wide' }); villain(g, 'turn', { blade: [115, 10], dx: VX + 1 }); });
-sc.frame(560, g => { hero(g, 'turn', { blade: [-80, 12], eyes: 'wide' });
-  villain(g, 'point', { blade: [-60, 0], dx: VX + 2, hand: 'L', breath: true }); });
-sc.frame(700, g => { hero(g, 'turn', { blade: [-80, 12], eyes: 'wide' });
-  villain(g, 'point', { blade: [-60, 0], dx: VX + 2, hand: 'L' });
-  caption(g, '...', 41, 3, C.ivory, { align: 'center', scale: 2 }); });
+// They part. The villain lowers his blade and reaches out... nothing more.
+const REACH = { blade: [120, 0], hand: 'R' };          // blade unlit in the back hand
+sc.frame(560, g => { hero(g, 'wave_2', { blade: UP_H, eyes: 'wide', hum: 1 }); villain(g, 'point', { ...REACH, breath: true }); });
+sc.frame(700, g => { hero(g, 'wave_2', { blade: UP_H, eyes: 'wide' });
+  villain(g, 'point', REACH);
+  caption(g, '...', 40, 8, C.ivory, { align: 'center', scale: 2 }); });
 // The hero shrugs it off and bows.
-sc.frame(520, g => { hero(g, 'crouch', { eyes: 'happy' }); villain(g, 'point', { blade: [-60, 0], dx: VX + 2, hand: 'L', breath: true }); });
+sc.frame(520, g => { hero(g, 'crouch', { eyes: 'happy' }); villain(g, 'point', { ...REACH, breath: true }); });
 
 // Poof off: both vanish, Clawd is back on his spot.
-const VPe = k.place('point', { dx: VX + 2, flip: true });
+const VPe = k.place('point', { dx: VX, flip: true });
 m2.poofSwap(sc,
-  g => { hero(g, 'idle'); villain(g, 'point', { dx: VX + 2, hand: 'L' }); },
+  g => { hero(g, 'idle'); villain(g, 'point', REACH); },
   g => k.clawd(g, 'idle'),
   [[P0.centre.x - 6, P0.centre.y - 3], [VPe.centre.x + 2, VPe.centre.y - 3, dark]]);
 m2.idleOutro(sc);

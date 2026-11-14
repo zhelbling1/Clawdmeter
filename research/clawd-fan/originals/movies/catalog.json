@@ -85,15 +85,15 @@
     "mood": "heavy",
     "rows": 37,
     "loop": [
-      13,
+      12,
       16
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
     "references": "The laser-sword duel from The Empire Strikes Back (1980): hero with a blue blade, a dark lord in a black helmet-mask, breathing vent and cape with a red blade, the dramatic reach. No lines quoted.",
-    "frames": 26,
-    "ms": 6260,
+    "frames": 25,
+    "ms": 6190,
     "colours": 16,
-    "kb": 39
+    "kb": 38.8
   },
   {
     "file": "Clawd-CupRipples.gif",
@@ -117,14 +117,14 @@
     "mood": "heavy",
     "rows": 37,
     "loop": [
-      13,
-      17
+      10,
+      27
     ],
     "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
-    "references": "The rolling-boulder temple escape from Raiders of the Lost Ark (1981): brown fedora, leather jacket, satchel, whip, golden idol on a pedestal.",
-    "frames": 27,
-    "ms": 5270,
-    "colours": 14,
+    "references": "The rolling-boulder temple escape from Raiders of the Lost Ark (1981): brown fedora, leather jacket, satchel, whip, golden idol on a pedestal, temple columns.",
+    "frames": 37,
+    "ms": 6750,
+    "colours": 15,
     "kb": 39.1
   },
   {

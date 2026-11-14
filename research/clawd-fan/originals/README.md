@@ -34,9 +34,9 @@ eyebrows, grin, laser sword, clash sparks, gold chain, sweat drop, gull).
 
 | Scene | Script | References |
 | --- | --- | --- |
-| Saber duel | `movies/saber_duel.js` | The laser-sword duel from *The Empire Strikes Back* (1980): a hero with a blue blade against a dark armoured lord (helmet-mask, breathing vent, cape, red blade), and the dramatic reach. No lines quoted. |
+| Saber duel | `movies/saber_duel.js` | The laser-sword duel from *The Empire Strikes Back* (1980): a hero with a blue blade against a dark armoured lord (helmet-mask, breathing vent, cape, steel gauntlets, red blade), staged at the two ends of the stage with every clash in the open middle, glowing blades (white core, coloured edge), and the dramatic reach. No lines quoted. |
 | Cup ripples | `movies/cup_ripples.js` | The rippling water glass from *Jurassic Park* (1993): safari hat, denim shirt, red neckerchief, rings in the water at each distant thump. |
-| Boulder run | `movies/boulder_run.js` | The temple escape from *Raiders of the Lost Ark* (1981): brown fedora, leather jacket, satchel, whip, a golden idol and the rolling boulder. |
+| Boulder run | `movies/boulder_run.js` | The temple escape from *Raiders of the Lost Ark* (1981): brown fedora, leather jacket, satchel, whip, a golden idol, temple columns and the rolling boulder. The 2.2 s run loop has the columns streaming past, a glance back, a trip that lets the boulder close in, and the escape. |
 | Here's Clawdy! | `movies/heres_clawdy.js` | The axe-through-the-door scene from *The Shining* (1980), as a cartoon: messy hair, wild eyebrows, a grin through a chopped hole. The caption is a two-word pun. |
 ## Gaming
 
