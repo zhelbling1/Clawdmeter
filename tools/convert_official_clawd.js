@@ -19,10 +19,15 @@
  * hand-drawn palette-index JSON grids (kind 'grid', resampled onto the
  * official Clawd's scale). Never mixed into research/clawd-official/.
  *
+ * Originals (research/clawd-fan/originals/<folder>/catalog.json, category
+ * "original") are this fork's gag scenes, authored with the kit in
+ * research/clawd-fan/originals/kit/. They are emitted last, inside
+ * #if CLAWD_ORIGINALS, with the loop window their catalog marks.
+ *
  * GIF decoding uses ImageMagick (`convert`, `identify`) when it is on PATH
  * and the dependency-free tools/gif_decode.js otherwise.
  *
- * Usage: node convert_official_clawd.js [--in DIR] [--fan DIR] [--out FILE] [--verify DIR]
+ * Usage: node convert_official_clawd.js [--in DIR] [--fan DIR] [--originals DIR] [--out FILE] [--verify DIR]
  *   --verify DIR  additionally writes a mid-frame PNG per animation for
  *                 eyeballing against the originals.
  */
@@ -121,6 +126,29 @@ const TANK_ANIMS = [
   { file: 'clawd-working-wizard.gif',     name: 'tank wizard' },
   { file: 'clawd-working-building.gif',   name: 'tank building' },
 ].map(a => ({ ...a, category: 'fan', dir: TANK_DIR, rows: 48 }));
+
+// Originals: this fork's pop-culture gag scenes, authored with the kit in
+// research/clawd-fan/originals/kit/. Every originals/<folder>/catalog.json
+// lists its scenes ({ file, name, mood, rows, loop, credit, references });
+// the loop is marked by the author, not searched for. They're emitted inside
+// #if CLAWD_ORIGINALS so boards without the flag build exactly as before.
+const ORIG_DIR = path.resolve(opt('--originals',
+  path.join(__dirname, '..', 'research', 'clawd-fan', 'originals')));
+function originalAnims() {
+  if (!fs.existsSync(ORIG_DIR)) return [];
+  const out = [];
+  for (const sub of fs.readdirSync(ORIG_DIR).sort()) {
+    const cat = path.join(ORIG_DIR, sub, 'catalog.json');
+    if (!fs.existsSync(cat)) continue;
+    for (const e of JSON.parse(fs.readFileSync(cat, 'utf8'))) {
+      if (!e.file || !e.name || !e.mood) throw new Error(`${cat}: entries need file, name and mood`);
+      out.push({ file: e.file, name: e.name, category: 'original', dir: path.join(ORIG_DIR, sub),
+        rows: e.rows && e.rows !== STAGE_H ? e.rows : undefined, loop: e.loop, mood: e.mood,
+        original: true, credit: e.credit });
+    }
+  }
+  return out;
+}
 
 function safeIdent(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -482,7 +510,8 @@ function buildAnim(grids, holdsMs, bg, opts = {}) {
   // record the loop region so the engine can hold or release it at will.
   const eq = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
   let loop = null;
-  {
+  // Originals mark their loop in catalog.json and draw it once: no search.
+  if (!opts.noCycle) {
     let best = null;
     const n = kept.length;
     for (let st = 0; st < n; st++)
@@ -572,11 +601,20 @@ function main() {
   out += '// ox/oy give the crop origin in stage cells.\n';
   out += '// Do not edit by hand — re-run the converter to refresh.\n';
   out += '// ============================================================\n';
+  const originals = originalAnims();
+  if (originals.length) {
+    out += '// "original" clips: this fork\'s pop-culture gag scenes, authored with\n';
+    out += '// research/clawd-fan/originals/kit/ (a catalog.json per folder). Their\n';
+    out += '// data and table entries sit inside #if CLAWD_ORIGINALS, after every\n';
+    out += '// other entry, so boards without the flag build exactly as before.\n';
+  }
   out += '#pragma once\n#include <stdint.h>\n\n';
+  if (originals.length) out += '#ifndef CLAWD_ORIGINALS\n#define CLAWD_ORIGINALS 0\n#endif\n\n';
   out += `#define SPLASH_PALETTE_SIZE ${PALETTE_SIZE}\n\n`;
   out += 'typedef struct {\n';
   out += '    const char *name;\n';
-  out += '    const char *category;      // "core" | "persona" | "fan" (fan-made)\n';
+  out += '    const char *category;      // "core" | "persona" | "fan" (fan-made)' +
+    (originals.length ? ' | "original"\n' : '\n');
   out += '    uint8_t  w, h;             // frame size, cells\n';
   out += '    uint8_t  ox;               // crop origin on the 55x37 stage\n';
   out += '    int8_t   oy;               //   (negative: art above the stage)\n';
@@ -591,10 +629,11 @@ function main() {
   const entries = [];
   let totalBytes = 0;
 
-  for (const meta of [...ANIMS, ...TANK_ANIMS]) {
+  for (const meta of [...ANIMS, ...TANK_ANIMS, ...originals]) {
     const src = path.join(meta.dir || (meta.fan ? FAN_DIR : IN_DIR), meta.file);
     if (!fs.existsSync(src)) {
-      console.error(`missing ${src} — ` + (meta.dir ? 'run tools/render_clawd_tank.js'
+      console.error(`missing ${src} — ` + (meta.original ? 'run its authoring script (research/clawd-fan/originals/)'
+                                          : meta.dir ? 'run tools/render_clawd_tank.js'
                                           : meta.fan ? 'see research/clawd-fan/README.md'
                                                      : 'run research/clawd-official/fetch.sh'));
       process.exit(1);
@@ -610,11 +649,15 @@ function main() {
       const frames = decodeGif(src);
       const { grids } = sampleGrids(frames, meta.rows);
       const bg = grids[0][0][0];  // top-left cell of frame 0 is background
-      anim = buildAnim(grids, frames.map(f => f.holdMs), bg);
+      anim = buildAnim(grids, frames.map(f => f.holdMs), bg, { noCycle: !!(meta.original && meta.loop) });
     }
     if (meta.rows) anim.oy -= meta.rows - STAGE_H;   // headroom above the stage
 
     const ident = safeIdent(meta.name);
+    if (entries.some(e => e.ident === ident)) throw new Error(`two animations are named like '${meta.name}'`);
+    if (meta.original && meta.loop &&
+        !(meta.loop[0] >= 0 && meta.loop[0] <= meta.loop[1] && meta.loop[1] < anim.frames.length))
+      throw new Error(`${meta.name}: loop ${meta.loop} outside its ${anim.frames.length} frames`);
     entries.push({ ident, meta, anim });
   }
 
@@ -712,12 +755,18 @@ function main() {
     }
   }
 
-  const emitted = entries.filter(e => e.meta.emit !== false);
-  for (const { ident, meta, anim } of emitted) {
+  // Originals go last (inside #if CLAWD_ORIGINALS), so every other entry
+  // keeps its index whether or not the flag is set.
+  const emitted = entries.filter(e => e.meta.emit !== false && !e.meta.original);
+  const extras = entries.filter(e => e.meta.original);
+  let origBytes = 0;
+  for (const { ident, meta, anim } of [...emitted, ...extras]) {
     const cellBytes = anim.frames.length * anim.w * anim.h;
-    totalBytes += cellBytes;
+    if (meta.original) origBytes += cellBytes; else totalBytes += cellBytes;
+    if (meta.original && meta === extras[0].meta) out += '#if CLAWD_ORIGINALS\n';
     console.log(`${meta.name.padEnd(14)} ${String(anim.w).padStart(2)}x${String(anim.h).padEnd(2)} ` +
-      `${String(anim.frames.length).padStart(3)} frames (${meta.kind || 'gif'}${meta.fan ? ', fan' : ''}, ` +
+      `${String(anim.frames.length).padStart(3)} frames (${meta.kind || 'gif'}${meta.fan ? ', fan' : ''}` +
+      `${meta.original ? `, original, ${meta.mood}` : ''}, ` +
       `${anim.palette.length} colors, ${(cellBytes / 1024).toFixed(1)} KB)`);
 
     if (anim.palette.length > PALETTE_SIZE)
@@ -738,20 +787,40 @@ function main() {
 
     if (VERIFY_DIR) writeVerifyPng(anim, ident, VERIFY_DIR);
   }
+  if (extras.length) out += '#endif // CLAWD_ORIGINALS\n\n';
 
-  out += `#define SPLASH_ANIM_COUNT ${emitted.length}\n`;
+  if (extras.length) {
+    out += '#if CLAWD_ORIGINALS\n';
+    out += `#define SPLASH_ANIM_COUNT ${emitted.length + extras.length}\n`;
+    out += '#else\n';
+    out += `#define SPLASH_ANIM_COUNT ${emitted.length}\n`;
+    out += '#endif\n';
+  } else {
+    out += `#define SPLASH_ANIM_COUNT ${emitted.length}\n`;
+  }
   out += 'static const splash_anim_def_t splash_anims[SPLASH_ANIM_COUNT] = {\n';
-  for (const { ident, meta, anim } of emitted) {
-    out += `    {"${meta.name}", "${meta.category}", ${anim.w}, ${anim.h}, ` +
+  const row = ({ ident, meta, anim }) =>
+    `    {"${meta.name}", "${meta.category}", ${anim.w}, ${anim.h}, ` +
       `${anim.ox}, ${anim.oy}, ${anim.frames.length}, ${anim.loop[0]}, ${anim.loop[1]}, ` +
       `${anim.palette.length}, ` +
-      `splash_${ident}_palette, splash_${ident}_frames, splash_${ident}_holds},\n`;
+      `splash_${ident}_palette, splash_${ident}_frames, splash_${ident}_holds},` +
+      (meta.original ? ` // mood: ${meta.mood}` : '') + '\n';
+  for (const e of emitted) out += row(e);
+  if (extras.length) {
+    out += '#if CLAWD_ORIGINALS\n';
+    for (const e of extras) out += row(e);
+    out += '#endif\n';
   }
   out += '};\n';
 
   fs.writeFileSync(OUT_FILE, out);
   console.log(`\nWrote ${OUT_FILE} (${emitted.length} animations, ` +
-    `${(totalBytes / 1024).toFixed(0)} KB cell data, ${(out.length / 1024).toFixed(0)} KB source)`);
+    `${(totalBytes / 1024).toFixed(0)} KB cell data, ${(out.length / 1024).toFixed(0)} KB source)` +
+    (extras.length ? `; plus ${extras.length} originals under CLAWD_ORIGINALS (${(origBytes / 1024).toFixed(0)} KB cell data)` : ''));
 }
 
-main();
+// The originals kit (research/clawd-fan/originals/kit/) reuses the stage
+// sampling and frame building, so the converter only runs when invoked.
+if (require.main === module) main();
+module.exports = { decodeGif, sampleGrids, buildAnim, inkInteriorHoles, encodePng,
+  STAGE_W, STAGE_H, PALETTE_SIZE, COLOR_MERGE_DIST2, EYE_INK };

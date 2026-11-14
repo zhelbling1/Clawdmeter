@@ -1,0 +1,50 @@
+[
+  {
+    "file": "Clawd-LevelUp.gif",
+    "name": "level up",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      15,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Old School RuneScape woodcutting: chopping a yew, the level-up fireworks. Generic lumberjack costume, no game sprites.",
+    "frames": 24,
+    "ms": 4750,
+    "colours": 16,
+    "kb": 38.6
+  },
+  {
+    "file": "Clawd-CardboardBox.gif",
+    "name": "cardboard box",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      18,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Metal Gear Solid (1998): hiding under a cardboard box, the bandana and sneaking suit, the red \"!\" alert. No game sprites.",
+    "frames": 29,
+    "ms": 5820,
+    "colours": 14,
+    "kb": 38.8
+  },
+  {
+    "file": "Clawd-BarrelRoll.gif",
+    "name": "barrel roll",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Star Fox 64 (1997): the \"Do a barrel roll!\" catchphrase. Generic aviator costume (flying cap, goggles, scarf, bomber jacket); no ships or characters.",
+    "frames": 30,
+    "ms": 5130,
+    "colours": 14,
+    "kb": 38.7
+  }
+]

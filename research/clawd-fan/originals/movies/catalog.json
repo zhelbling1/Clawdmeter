@@ -1,0 +1,146 @@
+[
+  {
+    "file": "Clawd-Briefcase.gif",
+    "name": "the briefcase",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      15,
+      18
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The glowing briefcase from Pulp Fiction (1994): slicked-back hair, skinny black tie, golden light from an unseen inside.",
+    "frames": 29,
+    "ms": 5920,
+    "colours": 11,
+    "kb": 29.9
+  },
+  {
+    "file": "Clawd-ZedsDead.gif",
+    "name": "zed's dead",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      18
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The chopper getaway from Pulp Fiction (1994): slicked-back hair, leather jacket, a raked chopper with ape-hanger bars, and the line \"Zed's dead\" as a two-word caption.",
+    "frames": 27,
+    "ms": 5220,
+    "colours": 13,
+    "kb": 40.3
+  },
+  {
+    "file": "Clawd-BulletTime.gif",
+    "name": "bullet time",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      14
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The slow-motion bullet dodge from The Matrix (1999): tiny black shades, long black coat, falling green code, bullets crawling past with ripples in the air.",
+    "frames": 24,
+    "ms": 5580,
+    "colours": 12,
+    "kb": 36.6
+  },
+  {
+    "file": "Clawd-LavaThumbs.gif",
+    "name": "thumbs up in lava",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      12,
+      15
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The thumbs-up in molten steel from Terminator 2 (1991): leather jacket, dark shades, a slow sink with one hand left giving a thumbs-up. Cartoon slapstick: he pops back out fine.",
+    "frames": 28,
+    "ms": 7490,
+    "colours": 13,
+    "kb": 37.7
+  },
+  {
+    "file": "Clawd-BatCountry.gif",
+    "name": "bat country",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      10,
+      13
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The desert drive from Fear and Loathing in Las Vegas (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats and the two-word caption \"bat country\".",
+    "frames": 21,
+    "ms": 4410,
+    "colours": 16,
+    "kb": 38
+  },
+  {
+    "file": "Clawd-SaberDuel.gif",
+    "name": "saber duel",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      13,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The laser-sword duel from The Empire Strikes Back (1980): hero with a blue blade, a dark lord in a black helmet-mask, breathing vent and cape with a red blade, the dramatic reach. No lines quoted.",
+    "frames": 26,
+    "ms": 6260,
+    "colours": 16,
+    "kb": 39
+  },
+  {
+    "file": "Clawd-CupRipples.gif",
+    "name": "cup ripples",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      17,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The rippling water glass from Jurassic Park (1993): safari hat, denim shirt, red neckerchief, rings in a cup at each distant footstep.",
+    "frames": 29,
+    "ms": 6330,
+    "colours": 13,
+    "kb": 34.9
+  },
+  {
+    "file": "Clawd-BoulderRun.gif",
+    "name": "boulder run",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      13,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The rolling-boulder temple escape from Raiders of the Lost Ark (1981): brown fedora, leather jacket, satchel, whip, golden idol on a pedestal.",
+    "frames": 27,
+    "ms": 5270,
+    "colours": 14,
+    "kb": 39.1
+  },
+  {
+    "file": "Clawd-HeresClawdy.gif",
+    "name": "here's clawdy",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      18,
+      21
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The axe-through-the-door scene from The Shining (1980), as a cartoon: messy hair, wild eyebrows, a grin through a chopped hole. Caption is a pun on the line.",
+    "frames": 28,
+    "ms": 5780,
+    "colours": 12,
+    "kb": 38.4
+  }
+]

@@ -42,7 +42,7 @@ music and movies). Every scene's authoring script follows these. Edit freely.
     No logos or trademarks (no studio logos, no Nintendo "?" blocks), no
     ripped game sprites (no OSRS or MGS sprite rips), no actor likenesses.
 11. **Text only as a short gag caption** of a few words in a pixel font
-    ("YOU DIED", "!", "LEVEL UP", "ZED'S DEAD"). No song lyrics, no long
+    ("!", "LEVEL UP", "ZED'S DEAD"). No song lyrics, no long
     movie quotes.
 12. **Cartoon tone:** dying, lava and axes stay slapstick, like "this is
     fine". Nothing gory.
@@ -50,8 +50,8 @@ music and movies). Every scene's authoring script follows these. Edit freely.
 ## Where they play
 
 13. **Each scene gets a mood slot:** dances and action go to the active
-    shows; dramatic ones (lava, YOU DIED, boulder) to the heavy shows; quiet
-    ones (cup ripples, the opal) to the screensaver's calm dips. All of them
+    shows; dramatic ones (lava, boulder, the saber duel) to the heavy shows; quiet
+    ones (cup ripples, the briefcase) to the screensaver's calm dips. All of them
     also join the Next/Previous animation button cycle.
 
 ## Process
@@ -65,15 +65,23 @@ music and movies). Every scene's authoring script follows these. Edit freely.
 
 ## The scene list
 
-**Gaming:** The cake is a lie (orange jumpsuit); YOU DIED → Praise the Sun
-(knight helmet); OSRS "Level up!" (chopping a yew, level-up fireworks); OSRS
-"Selling lobbies" (cage-fishing lobsters); OSRS party hat drop; Metal Gear
-Solid cardboard box + "!" (bandana); Do a barrel roll; Arrow to the knee.
+Kept after the first review (2026-11-14); \* marks a scene being redrawn
+or reworked.
 
-**Music:** the Dougie; the Bernie; the Jerk; Crank That; Wrecking ball;
-Moonwalk; the 80s arm shuffle; Zombie dance.
+**Gaming:** Portal fall\* (Clawd drops through a blue floor portal and out of
+an orange ceiling portal, faster each pass); OSRS "Level up!" (chopping a
+yew, level-up fireworks); Metal Gear Solid cardboard box + "!" (bandana); Do
+a barrel roll\* (he turns into a Clawd-shaped spaceship and rolls); Half-Life
+2\* (a Clawd in the orange hazard suit with a crowbar meets a Clawd in the
+blue suit with a briefcase).
 
-**Movies:** The briefcase (slicked hair, black tie); Zed's dead (chopper);
-Bullet time; Thumbs up in lava; Moon bike; Fear and Loathing car scene;
-Uncut Gems opal; Empire lightsaber duel; Cup ripples; Boulder run; King of
-the world; Here's Clawdy!
+**Music:** Moonwalk; Wrecking ball; Zombie dance.
+
+**Movies:** The briefcase (slicked hair, black tie); Zed's dead\* (chopper,
+gag plays once); Bullet time\*; Thumbs up in lava; Fear and Loathing car
+scene\*; Empire lightsaber duel\*; Cup ripples; Boulder run\*; Here's
+Clawdy!
+
+Cut in the review: Moon bike, the opal, King of the world, YOU DIED,
+Selling lobbies, Party hat drop, the cake is a lie, Arrow to the knee, the
+Dougie, the Bernie, the Jerk, Crank That, the arm shuffle.

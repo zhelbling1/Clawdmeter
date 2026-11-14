@@ -1,0 +1,50 @@
+[
+  {
+    "file": "Clawd-Moonwalk.gif",
+    "name": "moonwalk",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      27
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The moonwalk and its stagecraft from 1980s pop performances: white fedora, a single sparkly glove, toe stand, hat tip.",
+    "frames": 39,
+    "ms": 5940,
+    "colours": 9,
+    "kb": 40
+  },
+  {
+    "file": "Clawd-ZombieDance.gif",
+    "name": "zombie dance",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      12,
+      19
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The famous early-80s horror music video dance: full moon, zombie shuffle, sideways claw dance, shoulder shrugs; red jacket with black V stripes and shoulder pads.",
+    "frames": 28,
+    "ms": 5150,
+    "colours": 12,
+    "kb": 33.3
+  },
+  {
+    "file": "Clawd-WreckingBall.gif",
+    "name": "wrecking ball",
+    "mood": "heavy",
+    "rows": 48,
+    "loop": [
+      8,
+      13
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The 2013 power-ballad music video: a giant wrecking ball on a chain, ridden while hugging the chain; short platinum hair, one tear.",
+    "frames": 21,
+    "ms": 4070,
+    "colours": 12,
+    "kb": 37.4
+  }
+]
