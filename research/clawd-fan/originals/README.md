@@ -14,20 +14,14 @@ and a contact sheet.
 Scripts in `movies/`; shared props and costume pieces (chopper, BMX,
 convertible, lava pool, code rain, bullets with ripples, moon, bats, tiny
 shades, open coat, tinted aviators, hoodie, Hawaiian shirt, cigarette holder,
-thumbs-up glove) in `movies/props_m1.js`.
+thumbs-up glove; some are unused since Moon bike was cut) in `movies/props_m1.js`.
 
 | Scene | Script | Mood | References |
 |---|---|---|---|
 | Zed's dead | `movies/zeds_dead.js` | active | The chopper getaway from *Pulp Fiction* (1994): slicked hair, leather jacket, a raked chopper with ape-hanger bars, the two-word caption "ZED'S DEAD". |
 | Bullet time | `movies/bullet_time.js` | active | The slow-motion dodge from *The Matrix* (1999): tiny black shades, long black coat, falling green code, bullets with ripple trails. His "bend back" is the official squash pose, since his body can't be redrawn. |
 | Thumbs up in lava | `movies/lava_thumbs.js` | heavy | The molten-steel farewell from *Terminator 2: Judgment Day* (1991): leather jacket, dark shades, a slow sink and a last thumbs-up (a white cartoon glove). Slapstick: he pops back out fine. |
-| Moon bike | `movies/moon_bike.js` | calm | The flying bicycle crossing the full moon in *E.T. the Extra-Terrestrial* (1982): red hoodie, a BMX with a basket holding a blanket bundle (no character drawn). |
 | Bat country | `movies/bat_country.js` | heavy | The desert drive in *Fear and Loathing in Las Vegas* (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats, the caption "BAT COUNTRY". |
-
-**One deliberate exception to "his body stays orange":** in *Moon bike*,
-the cells of Clawd and the bike that pass in front of the moon are drawn as a
-dark silhouette (the shot being referenced); everywhere else he keeps his
-official colours. The catalog entry carries the same note.
 
 All of these are caricature: costumes and situations only, no actor
 likenesses, no logos or studio marks, captions of two words.
@@ -40,11 +34,9 @@ eyebrows, grin, laser sword, clash sparks, gold chain, sweat drop, gull).
 
 | Scene | Script | References |
 | --- | --- | --- |
-| The opal | `movies/opal.js` | The black opal from *Uncut Gems* (2019): tight curls, glasses, gold chain, a rough stone held up to a lamp with a galaxy of colour inside. |
 | Saber duel | `movies/saber_duel.js` | The laser-sword duel from *The Empire Strikes Back* (1980): a hero with a blue blade against a dark armoured lord (helmet-mask, breathing vent, cape, red blade), and the dramatic reach. No lines quoted. |
 | Cup ripples | `movies/cup_ripples.js` | The rippling water glass from *Jurassic Park* (1993): safari hat, denim shirt, red neckerchief, rings in the water at each distant thump. |
 | Boulder run | `movies/boulder_run.js` | The temple escape from *Raiders of the Lost Ark* (1981): brown fedora, leather jacket, satchel, whip, a golden idol and the rolling boulder. |
-| King of the world | `movies/king_of_the_world.js` | The arms-wide moment at the ship's bow in *Titanic* (1997): floppy blond hair in the wind, white shirt and braces, sea spray, a passing gull. |
 | Here's Clawdy! | `movies/heres_clawdy.js` | The axe-through-the-door scene from *The Shining* (1980), as a cartoon: messy hair, wild eyebrows, a grin through a chopped hole. The caption is a two-word pun. |
 ## Gaming
 
@@ -55,14 +47,9 @@ in-front gap) are in `gaming/props.js`.
 
 | Scene | Script | Mood | References |
 | --- | --- | --- | --- |
-| The cake is a lie | `gaming/cake.js` | active | Portal (2007): orange jumpsuit tied at the waist, white tank top, long-fall boots, a ceiling portal, the cake that turns out to be a hologram. |
-| YOU DIED → Praise the Sun | `gaming/youdied.js` | heavy | Dark Souls (2011): the red "YOU DIED" caption, the bonfire checkpoint, a sun-emblem knight and the arms-up sun salute. |
 | Level up! | `gaming/levelup.js` | active | Old School RuneScape woodcutting: chopping a yew until the level-up fireworks. |
-| Selling lobbies | `gaming/lobbies.js` | calm | Old School RuneScape: cage-fishing lobsters and the "selling lobbies" trade-chat cry (a crab catching lobsters). |
-| Party hat drop | `gaming/partyhat.js` | active | Old School RuneScape: the rare blue party hat and the scramble for a holiday drop. |
 | Cardboard box | `gaming/box.js` | active | Metal Gear Solid (1998): hiding under a cardboard box, bandana and sneaking suit, the red "!" alert. |
 | Barrel roll | `gaming/barrelroll.js` | active | Star Fox 64 (1997): "Do a barrel roll!" Generic aviator costume; no ships or characters. |
-| Arrow to the knee | `gaming/knee.js` | heavy | The Elder Scrolls V: Skyrim (2011): the guard who took an arrow in the knee. Slapstick, no blood. |
 ## Dances (`music/`)
 
 Dance moves only: no song titles, no lyrics, no likenesses. `music/props.js`
@@ -76,10 +63,5 @@ moon) and the poof-on / poof-off bookends.
 | Scene | Script | References |
 |---|---|---|
 | Moonwalk | `music/moonwalk.js` | The moonwalk and its 1980s stagecraft: white fedora, one sparkly glove, toe stand, hat tip. |
-| The Dougie | `music/dougie.js` | The 2010-era dance craze: a hand sliding over the side of the head while leaning and rocking side to side; backwards fitted cap, gold chain. |
-| The Bernie | `music/bernie.js` | The late-2010s "Bernie lean": leaning way back, arms loose, swaying; sunglasses and a loud open shirt, with a friend in shades and a bandana leaning beside him. |
-| The Jerk | `music/jerk.js` | The late-2000s West Coast street dance: one foot kicked out as the body jerks back, then a step back and rock forward; skinny jeans, bright high-tops, flat-brim cap, shades. |
-| Crank That | `music/crank.js` | The 2007 dance craze: the crank, the jump-and-lean on one leg, the flying superhero punch; oversized white tee, bucket hat. |
 | Wrecking ball | `music/wreckingball.js` | The 2013 power-ballad music video: riding a giant wrecking ball while hugging its chain, short platinum hair, one tear. The chain runs up through the headroom rows. Mood: heavy. |
-| Arm shuffle | `music/shuffle.js` | The famous late-80s music-video dance: a side-to-side shuffle with bent arms, more committed each pass; ginger quiff, trench coat. |
 | Zombie dance | `music/zombie.js` | The famous early-80s horror music video's dance: full moon, zombie shuffle with an arm out, sideways claw dance, shoulder shrugs, a bow; red jacket with black V stripes and shoulder pads. |
