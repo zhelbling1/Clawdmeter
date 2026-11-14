@@ -26,6 +26,7 @@ static void check_one_clawd(void) {
                      : fake_pet_active() && !s.face            ? "pet mode without the face"
                      : fake_pet_active() && beat != B_PET      ? "pet mode outside its beat"
                      : fake_saver_active() && beat != B_SCREENSAVER ? "an effect screensaver outside its beat"
+                     : fake_status_note && beat != B_BROWSE     ? "an animation's name outside browse"
                                                                : NULL;
     if (!what) return;
     broke = true;
@@ -117,6 +118,7 @@ static void fresh_director(void) {
     react_anim = NULL;
     joy_pending = false;
     saver_turn = 0;
+    browse_cursor = -1;
     fake_party_reset();
     ClawdTuning fast;
     clawd_tuning_fast(&fast);
@@ -148,7 +150,7 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big, int has_perform
         t += gap;
         UsageData d = live_payload();
         SignalsUpdate sig = no_signal();
-        switch (fz_next() % 18) {
+        switch (fz_next() % 20) {
         case 0: case 1:  world.activity = (int)fz_range(0, 3); break;
         case 2:          world.activity = 3; break;
         case 3: case 4:  sig.event_fired = true; sig.event = "psbtf"[fz_next() % 5]; sig.event_seq = ++es; break;
@@ -169,6 +171,9 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big, int has_perform
         case 14:         director_set_liveliness((int)fz_range(1, 5)); continue;
         case 15:         (void)director_page_open(); continue;     // PWR: the Clawd page
         case 16:         director_page_closed(); continue;         // PWR again: the meters
+        case 17: case 18:                                          // next / previous animation
+            (void)director_button(fz_next() % 2 == 0, fz_next() % 2 ? +1 : -1);
+            continue;
         default:         break;                   // a quiet stretch
         }
         d.session_pct = pct;
@@ -599,6 +604,190 @@ static void test_screensaver_takes_turns_with_effects(void) {
     assert_one_clawd();
 }
 
+// ─── Next / previous animation buttons (browse) ──────────────────────────────
+// A press plays the cycle's scene full size and he goes home; a press while
+// one plays skips straight to the next (the performer never leaves between).
+static void wait_for_scene(int before) {
+    for (int i = 0; i < 300 && fake_scenes == before; i++) run_for(50);
+    TEST_ASSERT_TRUE_MESSAGE(fake_scenes > before, "no scene played");
+}
+
+static void browse_world(bool has_performer) {
+    world.has_big = world.has_performer = has_performer;
+    fresh_director();
+    world.activity = 1;                          // you're working: no screensaver meanwhile
+    run_for(500);
+}
+
+static void test_browse_plays_the_next_scene_and_goes_home(void) {
+    browse_world(true);
+    int before = fake_scenes;
+    TEST_ASSERT_FALSE(director_button(false, +1));
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    wait_for_scene(before);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(0), fake_last_scene);   // the first press: the first
+    TEST_ASSERT_EQUAL_STRING(anim_cycle_name(0), fake_status_note);
+    TEST_ASSERT_FALSE(fake_on_screen().corner);
+    run_for(clawd_tuning().browse_label_ms + 100);
+    TEST_ASSERT_NULL_MESSAGE(fake_status_note, "the name shows briefly");
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    run_for(15 * 1000);                          // played out, off, and home
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    TEST_ASSERT_TRUE(fake_corner_seated_still());
+    // The cursor stays where it was: the next press plays the second.
+    before = fake_scenes;
+    TEST_ASSERT_FALSE(director_button(true, +1));
+    wait_for_scene(before);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(1), fake_last_scene);
+    run_for(15 * 1000);
+    // Previous before anything played starts at the last.
+    browse_cursor = -1;
+    before = fake_scenes;
+    TEST_ASSERT_FALSE(director_button(false, -1));
+    wait_for_scene(before);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(anim_cycle_count() - 1), fake_last_scene);
+    run_for(15 * 1000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    assert_one_clawd();
+    world.activity = 0;
+}
+
+static void test_browse_skips_ahead_without_leaving(void) {
+    browse_world(true);
+    director_button(false, +1);
+    wait_for_scene(fake_scenes);
+    run_for(1000);                               // mid-scene
+    for (int k = 1; k <= 3; k++) {               // next, next, next
+        const int before = fake_scenes;
+        director_button(false, +1);
+        for (int t = 0; t < 200 && fake_scenes == before; t += TICK_MS) {
+            run_for(TICK_MS);
+            TEST_ASSERT_TRUE_MESSAGE(fake_on_screen().performer, "he left the stage between scenes");
+        }
+        TEST_ASSERT_EQUAL_INT(anim_cycle_anim(k), fake_last_scene);
+        TEST_ASSERT_EQUAL_STRING(anim_cycle_name(k), fake_status_note);
+        run_for(500);
+    }
+    director_button(false, -1);                  // and back
+    run_for(100);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(2), fake_last_scene);
+    // While he walks off at the end, a press turns him around for the next.
+    for (int i = 0; i < 2000 && step != 4; i++) run_for(TICK_MS);
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    TEST_ASSERT_EQUAL_INT(4, step);
+    run_for(200);
+    TEST_ASSERT_TRUE(fake_on_screen().performer);
+    const int before = fake_scenes;
+    director_button(false, +1);
+    run_for(100);
+    TEST_ASSERT_EQUAL_INT(before + 1, fake_scenes);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(3), fake_last_scene);
+    run_for(15 * 1000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    assert_one_clawd();
+    world.activity = 0;
+}
+
+// Pressed during a show, the show gives way to the browse on the spot.
+static void test_browse_takes_over_a_show(void) {
+    browse_world(true);
+    TEST_ASSERT_TRUE(director_debug("show"));
+    wait_for_scene(fake_scenes);                 // the show's scene
+    director_button(false, -1);
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    run_for(100);
+    TEST_ASSERT_EQUAL_INT(anim_cycle_anim(anim_cycle_count() - 1), fake_last_scene);
+    run_for(15 * 1000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    assert_one_clawd();
+    world.activity = 0;
+}
+
+// Elsewhere the press does what a button does today: the screensaver face
+// goes home (the next press browses), an alert stays up, the page and the
+// tap-peek's face are left alone.
+static void test_browse_press_elsewhere_is_a_plain_button(void) {
+    world.has_big = world.has_performer = true;
+    fresh_director();
+    TEST_ASSERT_TRUE(director_debug("screensaver 0"));
+    for (int i = 0; i < 100 && !face_visible(); i++) run_for(100);
+    TEST_ASSERT_TRUE(face_visible());
+    director_button(false, +1);
+    TEST_ASSERT_EQUAL_STRING("face-home", director_beat_name());
+    TEST_ASSERT_EQUAL_INT(-1, browse_cursor);
+    run_for(5000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    director_button(false, +1);
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    run_for(4000);
+
+    director_alert("needs you");                 // an alert outranks it
+    run_for(4000);
+    TEST_ASSERT_EQUAL_STRING("attention", director_beat_name());
+    const int scenes = fake_scenes;
+    director_button(false, +1);
+    run_for(4000);
+    TEST_ASSERT_EQUAL_STRING("attention", director_beat_name());
+    TEST_ASSERT_EQUAL_INT(scenes, fake_scenes);
+    TEST_ASSERT_TRUE(attention_on);
+    director_tap(200, 300);
+    run_for(6000);
+
+    world.activity = 1;
+    TEST_ASSERT_TRUE(director_page_open());      // the page keeps him
+    director_button(false, +1);
+    TEST_ASSERT_EQUAL_STRING("page", director_beat_name());
+    director_page_closed();
+    run_for(5000);
+    TEST_ASSERT_TRUE(director_debug("peek"));    // and so does the peek's face
+    for (int i = 0; i < 100 && !face_visible(); i++) run_for(100);
+    director_button(true, -1);
+    TEST_ASSERT_EQUAL_STRING("peek", director_beat_name());
+    director_tap(240, 300);
+    run_for(6000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    assert_one_clawd();
+    world.activity = 0;
+}
+
+// No-nonsense has no shows, but a press asks for one: it still plays.
+static void test_browse_plays_at_no_nonsense(void) {
+    browse_world(true);
+    director_set_liveliness(1);
+    const int before = fake_scenes;
+    director_button(false, +1);
+    wait_for_scene(before);
+    TEST_ASSERT_EQUAL_STRING("browse", director_beat_name());
+    run_for(15 * 1000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    director_set_liveliness(CLAWD_LIVELINESS_DEFAULT);
+    assert_one_clawd();
+    world.activity = 0;
+}
+
+// Without the performer the cycle is the corner acts, in his seat.
+static void test_browse_corner_acts_without_performer(void) {
+    browse_world(false);
+    director_button(false, +1);
+    run_for(50);
+    TEST_ASSERT_EQUAL_STRING(mascot_cycle_name(0), fake_last_act);
+    TEST_ASSERT_EQUAL_STRING(mascot_cycle_name(0), fake_status_note);
+    TEST_ASSERT_TRUE(fake_corner_acting());
+    run_for(300);
+    director_button(false, +1);                  // skip: cut to the next act
+    TEST_ASSERT_EQUAL_STRING(mascot_cycle_name(1), fake_last_act);
+    director_button(false, -1);
+    director_button(false, -1);                  // back past the first: the last
+    TEST_ASSERT_EQUAL_STRING(mascot_cycle_name(mascot_cycle_count() - 1), fake_last_act);
+    run_for(5000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    TEST_ASSERT_TRUE(fake_corner_seated_still());
+    TEST_ASSERT_TRUE(director_debug("next"));    // the QA hook
+    run_for(5000);
+    assert_one_clawd();
+    world.activity = 0;
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_screensaver_calm_dip_keeps_one_clawd);
@@ -622,5 +811,11 @@ int main(int, char**) {
     RUN_TEST(test_header_tap_on_stale_meters_is_a_peek);
     RUN_TEST(test_test_runs_party_and_hunt);
     RUN_TEST(test_screensaver_takes_turns_with_effects);
+    RUN_TEST(test_browse_plays_the_next_scene_and_goes_home);
+    RUN_TEST(test_browse_skips_ahead_without_leaving);
+    RUN_TEST(test_browse_takes_over_a_show);
+    RUN_TEST(test_browse_press_elsewhere_is_a_plain_button);
+    RUN_TEST(test_browse_plays_at_no_nonsense);
+    RUN_TEST(test_browse_corner_acts_without_performer);
     return UNITY_END();
 }

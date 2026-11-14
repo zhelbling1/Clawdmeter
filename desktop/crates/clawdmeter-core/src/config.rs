@@ -898,6 +898,8 @@ mod tests {
         assert_eq!(s.buttons, [ButtonAction::Enter, ButtonAction::None, ButtonAction::Chord(teams)]);
         let s = settings("button_primary = bogus\nbutton_secondary = ctrl+\nbutton_pwr = shift+hyper\n");
         assert_eq!(s.buttons, Button::ALL.map(Button::default_action), "unknown values read as the default");
+        let s = settings("button_primary = previous-animation\nbutton_secondary = next-animation\n");
+        assert_eq!(s.buttons[..2], [ButtonAction::PreviousAnimation, ButtonAction::NextAnimation]);
         let mut cfg = ConfigFile::default();
         let mut s = settings("");
         s.apply_to(&mut cfg, &paths());

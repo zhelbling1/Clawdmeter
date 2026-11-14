@@ -6,7 +6,8 @@
 // Pure: no Arduino, so it runs in the native unit tests. The values are the
 // wire format; never renumber them.
 //
-//   0..6      a preset (enum below)
+//   0..8      a preset (enum below); firmware older than 7 and 8 ignores
+//             them (the payload parser keeps the stored action)
 //   0x10000 | hold << 12 | mods << 8 | usage
 //             a keyboard chord: `usage` is a HID keyboard usage
 //             (BTN_KEY_USAGE_MIN..BTN_KEY_USAGE_MAX), `mods` the HID modifier
@@ -27,6 +28,8 @@ enum ButtonPreset {
     BTN_ACT_ENTER      = 4,   // HID Enter
     BTN_ACT_ESCAPE     = 5,   // HID Escape
     BTN_ACT_BRIGHTNESS = 6,   // cycle the brightness (PWR default)
+    BTN_ACT_NEXT_ANIM  = 7,   // Clawd plays the next animation in the cycle (director_button)
+    BTN_ACT_PREV_ANIM  = 8,   // ... the previous one
     BTN_ACT_PRESET_COUNT
 };
 
@@ -56,6 +59,8 @@ enum ButtonKind {
     BTN_KIND_KEY,          // keyboard report: `key` + `modifiers`
     BTN_KIND_CONSUMER,     // consumer report: `consumer`
     BTN_KIND_BRIGHTNESS,
+    BTN_KIND_NEXT_ANIM,    // on the device: the director plays the next animation
+    BTN_KIND_PREV_ANIM,    //   ... or the previous one (no HID report)
 };
 
 struct ButtonBinding {
@@ -75,6 +80,10 @@ int32_t button_action_clamp(int32_t v, int32_t fallback);
 
 // What a valid value does. An invalid one decodes as BTN_KIND_NONE.
 ButtonBinding button_action_decode(int32_t v);
+
+// +1 for next animation, -1 for previous, 0 for anything else (what
+// main.cpp hands director_button).
+int button_action_anim_step(int32_t v);
 
 // The keyboard report while buttons hold keys down. Each holder (a button)
 // has its own modifiers and key; the report is all of them merged with an

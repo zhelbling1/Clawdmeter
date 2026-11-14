@@ -1206,9 +1206,11 @@ impl SettingsView {
         for (i, m) in MediaKey::ALL.into_iter().enumerate() {
             media = media.child(choice(format!("{id}-media-{i}"), ButtonAction::Media(m), m.label().into()));
         }
-        let other = chips()
-            .child(choice(format!("{id}-brightness"), ButtonAction::Brightness, "Brightness".into()))
-            .child(choice(format!("{id}-nothing"), ButtonAction::None, "Nothing".into()));
+        let mut other = chips();
+        for a in ButtonAction::DEVICE {
+            other = other.child(choice(format!("{id}-{}", a.as_str()), a, a.label(style)));
+        }
+        let other = other.child(choice(format!("{id}-nothing"), ButtonAction::None, "Nothing".into()));
         div()
             .w_full()
             .flex()
@@ -2071,6 +2073,8 @@ fn action_icon(a: ButtonAction) -> &'static str {
         ButtonAction::Enter => "corner-down-left",
         ButtonAction::ShiftTab | ButtonAction::Escape | ButtonAction::Chord(_) => "keyboard",
         ButtonAction::Brightness => "sun",
+        ButtonAction::NextAnimation => "chevron-right",
+        ButtonAction::PreviousAnimation => "chevron-left",
         ButtonAction::Media(MediaKey::PlayPause) => "play",
         ButtonAction::Media(MediaKey::Previous) => "skip-back",
         ButtonAction::Media(MediaKey::Next) => "skip-forward",
@@ -2088,6 +2092,7 @@ fn action_hint(b: Button, a: ButtonAction) -> &'static str {
         ButtonAction::ShiftTab => "Claude Code mode",
         ButtonAction::Space | ButtonAction::Tab | ButtonAction::Enter | ButtonAction::Escape => "Key",
         ButtonAction::Brightness => "Cycles the brightness",
+        ButtonAction::NextAnimation | ButtonAction::PreviousAnimation => "Clawd on the device",
         ButtonAction::Media(_) => "Media key",
         ButtonAction::Chord(c) if c.hold && b.can_hold() => "Shortcut, held",
         ButtonAction::Chord(_) => "Shortcut",

@@ -14,6 +14,8 @@ void clawd_tuning_defaults(ClawdTuning* t) {
     t->calm_min_ms      = 3 * MIN;
     t->calm_max_ms      = 5 * MIN;
     t->calm_scene_ms    = 10 * SEC;
+    t->browse_scene_ms  = 10 * SEC;   // a press skips ahead; liveliness doesn't scale it
+    t->browse_label_ms  = 3 * SEC;
     t->alert_timeout_ms = 2 * MIN;
     t->long_turn_ms     = 2 * MIN;
     t->joy_pending_ms   = 5 * MIN;
@@ -46,6 +48,7 @@ void clawd_tuning_fast(ClawdTuning* t) {
     t->calm_min_ms      = 8 * SEC;
     t->calm_max_ms      = 10 * SEC;
     t->calm_scene_ms    = 5 * SEC;
+    t->browse_scene_ms  = 5 * SEC;
     t->alert_timeout_ms = 20 * SEC;
     t->long_turn_ms     = 10 * SEC;
     t->joy_pending_ms   = 30 * SEC;

@@ -18,6 +18,8 @@ struct ClawdTuning {
     uint32_t calm_min_ms;        // face rests this long (min..max, jittered)
     uint32_t calm_max_ms;        //   before dipping into a calm performance
     uint32_t calm_scene_ms;      // loop hold of a calm scene
+    uint32_t browse_scene_ms;    // loop hold of a scene a next / previous animation button picked
+    uint32_t browse_label_ms;    //   ... its name stays on the status line this long
     uint32_t alert_timeout_ms;   // attention gives up after this long
     uint32_t long_turn_ms;       // a turn this long earns a wave on Stop
     uint32_t joy_pending_ms;     // a reset celebration may wait this long for him to get home

@@ -56,7 +56,13 @@ void director_set_pairing_touch(bool on);
 // that press first dismisses an active alert and returns true (the caller
 // then skips the button's normal action, push to talk or brightness);
 // otherwise false.
-bool director_button(bool main_button);
+// anim_step +1 / -1: the button's action is next / previous animation
+// (button_action_anim_step). From the meters he plays that scene of the
+// cycle full size (anim_sets.h; corner acts without the performer) and goes
+// home; a press while one plays skips straight to the next. Elsewhere the
+// press only does what any button does (the screensaver and pet mode go
+// home, an alert stays up).
+bool director_button(bool main_button, int anim_step = 0);
 // Apply a liveliness level (clawd_policy.h) now: the tuning changes, and
 // what the new level rules out (a show, the screensaver, idle acts, a
 // pending reaction) stops.
@@ -96,7 +102,8 @@ const char*  director_beat_name(void);
 
 // QA hook for the `clawd <beat>` serial command: start a beat now so it can
 // be captured with `screenshot` on hardware. beat = show | screensaver [n] |
-// attention | joy | lurk | peek [x] | pet | pass | fail | confetti | home.
+// attention | joy | lurk | peek [x] | pet | pass | fail | confetti | next |
+// prev | home. `next` / `prev` press a next / previous animation button.
 // Returns false for an unknown name, or for show / screensaver / lurk / peek
 // / pet while another beat is still running (lurk also needs the full-size
 // sprite, i.e. PSRAM). `peek` is a tap on the meters at x (default: three

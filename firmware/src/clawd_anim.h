@@ -32,6 +32,9 @@ int              clawd_anim_count(void);
 const ClawdAnim* clawd_anim_at(int index);          // NULL when out of range
 const ClawdAnim* clawd_anim(const char* name);      // NULL when not found
 int              clawd_anim_index(const char* name); // -1 when not found
+// Fan-made (category `fan`: research/clawd-fan/, the clawd-tank clips among
+// them) rather than official. False out of range.
+bool             clawd_anim_fan(int index);
 // Repaint the palettes in the live TH_CLAWD (theme_palette.h) after a new
 // palette; whoever has a frame on screen redraws it (mascot_repaint,
 // performer_repaint).

@@ -505,6 +505,8 @@ static void init_usage_screen(lv_obj_t* scr) {
 // ---- Attention message on the status line (the director sequences the rest).
 static bool alert_active = false;
 static const char* still_shown = nullptr;   // minimal mode: status word on screen
+static const char* status_note = nullptr;   // ui_set_status_note
+static const char* note_shown = nullptr;    //   ... the one the label holds
 
 // ======== Public API ========
 
@@ -795,6 +797,27 @@ void ui_tick_anim(void) {
 
     if (alert_active) return;          // the status line holds the alert message
 
+    if (status_note != note_shown) {
+        note_shown = status_note;
+        if (note_shown) {
+            // "<glyph> Name", one line, cut rather than wrapped if it's long.
+            static char nbuf[48];
+            const int at = snprintf(nbuf, sizeof(nbuf), "%s ", spinner_frames[1]);
+            snprintf(nbuf + at, sizeof(nbuf) - at, "%s", note_shown);
+            if (nbuf[at] >= 'a' && nbuf[at] <= 'z') nbuf[at] = (char)(nbuf[at] - 'a' + 'A');
+            lv_label_set_long_mode(lbl_anim, LV_LABEL_LONG_DOT);
+            lv_obj_set_size(lbl_anim, L.status_w, lv_font_get_line_height(L.status_font));
+            lv_label_set_text(lbl_anim, nbuf);
+        } else {
+            lv_label_set_long_mode(lbl_anim, LV_LABEL_LONG_WRAP);
+            lv_obj_set_size(lbl_anim, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            anim_last_ms = 0;          // the line redraws below
+            still_shown = nullptr;
+            frozen_shown = nullptr;
+        }
+    }
+    if (note_shown) return;
+
     if (still) {
         // One glyph, one word per state; redrawn only when it changes.
         const char* text = !s_ble_connected ? "Waiting"
@@ -898,13 +921,19 @@ void ui_set_alert_text(const char* message) {
         // One line: without a fixed height LONG_DOT would wrap onto the cards.
         lv_obj_set_size(lbl_anim, L.status_w, lv_font_get_line_height(L.status_font));
         lv_label_set_text(lbl_anim, message);
+        note_shown = nullptr;      // the alert has the label now
         return;
     }
     if (!alert_active) return;
     alert_active = false;
+    note_shown = nullptr;          // a note still set comes back on the next tick
     lv_label_set_long_mode(lbl_anim, LV_LABEL_LONG_WRAP);
     lv_obj_set_size(lbl_anim, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     anim_last_ms = 0;          // whimsical line redraws on the next tick
     still_shown = nullptr;
     frozen_shown = nullptr;
+}
+
+void ui_set_status_note(const char* text) {
+    status_note = (text && text[0] && !minimal_mode()) ? text : nullptr;
 }
