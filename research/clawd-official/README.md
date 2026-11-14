@@ -17,7 +17,7 @@ The desk-pet feature is a separate system called the **Hardware Buddy**.
 **Unlisted assets:** several files answer at their URL but are referenced by
 no shipped bundle (found by name probing — the server serves real GIFs for
 valid names and an HTML catch-all otherwise): Soccer, Basketball, Skateboard,
-Trumpet (persona); Walking, Jumping, Pointing (core). Presumably staged for
+Trumpet, Book (persona); Walking, Jumping, Pointing (core). Presumably staged for
 seasonal/promo use — Soccer is the FIFA World Cup 2026 football clip.
 
 ## Core set (`/images/clawd/core/`, 2750×1850 canvas, 50 px per art-pixel)
@@ -60,6 +60,7 @@ Decoding recipe: for frame t, paint every group whose opacity at t is 100.
 | `Clawd-Basketball.gif` | 56 | 90 ms | dribbling (unlisted) |
 | `Clawd-Skateboard.gif` | 74 | 90 ms | skateboarding (unlisted) |
 | `Clawd-Trumpet.gif` | 81 | 90 ms | golden trumpet + floating notes (unlisted) |
+| `Clawd-Book.gif` | 107 | 80-90 ms | reading a book with round glasses (unlisted; found by name probing, credit to the Vsemil/Clawdmeter and SirTobi88/Clawdmeter forks) |
 | `7bbe5052.gif` | 11 | 160 ms | sailing a boat (short loop) |
 | `ac0fa108.gif` | 68 | 80 ms | sailing a boat (full scene) |
 
@@ -120,3 +121,10 @@ but the state model is the official vocabulary for desk-pet behavior.
 `companion-inc/pet-clawd` on GitHub archived the same core/persona sets
 (2026-06-12) plus trimmed frame exports; its `art/clawd-official/README.md`
 documented the in-app usage of each clip.
+
+Forks that archived the unlisted `Clawd-Book.gif` (HTTP 200 at
+`https://claude.ai/images/clawd/persona/Clawd-Book.gif`, referenced by no
+shipped bundle): <https://github.com/Vsemil/Clawdmeter> and
+<https://github.com/SirTobi88/Clawdmeter>.
+
+Fan-made animations are not kept here; they live in `../clawd-fan/`.

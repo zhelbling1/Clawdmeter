@@ -72,7 +72,7 @@ static ClawdRng rng;
 // Per mood group: how long he sits between acts and which acts he picks.
 // "lurking" = the walk-off / full-size lurk / walk-back trip.
 static const char* const ACTS_BY_RATE[4][4] = {
-    { "pointing", "lurking", NULL,       NULL      },   // idle: sparse, sneaky
+    { "pointing", "lurking", "idle hearts", NULL    },   // idle: sparse, sneaky
     { "waving",   "lurking", "pointing", NULL      },   // normal
     { "waving",   "dancing", "lurking",  NULL      },   // active
     { "dancing",  "waving",  "dancing",  "lurking" },   // heavy: can't sit still
@@ -86,6 +86,7 @@ static const char* const TALL_FALLBACK = "dancing";
 // Everything the corner buffer must fit.
 static const char* const CORNER_ANIMS[] = {
     "walking", "waving", "pointing", "dancing", "jumping happy",
+    "idle hearts",   // fan-made (TB1982), 24x28 on the same left edge: fits the buffer above
 };
 
 // ─── Rendering ───────────────────────────────────────────────────────────────

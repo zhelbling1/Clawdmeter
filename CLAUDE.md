@@ -16,7 +16,7 @@ writes them to the device over BLE.
   `daemon-parity.md` (the removed bash/Python daemons → the app).
 - `tools/`: asset converters, `ci/` (release and manifest scripts, with
   unittests), `packaging/`. `research/clawd-official/`: the official Clawd
-  animation archive.
+  animation archive; `research/clawd-fan/`: fan-made animations (credited).
 - `docs/simulator.md`: simulator manual; `docs/sim-grid.md`: every panel at
   once (`tools/simgrid/`).
 
@@ -133,8 +133,10 @@ Adding or renaming a key means changing both sides: `clawdmeter-core`'s
 - **The chime is described only by its note and envelope** (C#5, 554.5 Hz,
   attack/strike/ring) in code, docs, commits and PRs. Never name or hint at
   what inspired it, and add no credit line for it.
-- **Clawd sprite art comes only from the official animations** in
-  `research/clawd-official/`; never draw or retouch sprite frames. The
+- **Clawd sprite art comes from the official animations** in
+  `research/clawd-official/`, plus the credited fan-made ones in this fork's
+  `research/clawd-fan/` (category `fan`); never draw or retouch sprite frames
+  yourself, and never put fan art in the official folder. The
   palette's Clawd colour swaps his body orange at draw time
   (`theme_clawd_art`) and leaves the frames as published. The large
   screensaver face is the exception: it's built from LVGL shapes and may be

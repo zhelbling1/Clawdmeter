@@ -12,8 +12,11 @@ node tools/convert_official_clawd.js --verify /tmp/verify   # + per-animation PN
 ```
 
 Converts the official Anthropic Clawd animations archived in
-`research/clawd-official/` (GIFs decoded via ImageMagick, the Laptop and
-Soccer Lottie exports read directly) into a single
+`research/clawd-official/` (GIFs decoded via ImageMagick, or by the
+dependency-free `tools/gif_decode.js` when ImageMagick isn't installed; the
+Laptop and Soccer Lottie exports read directly) and the fan-made ones in
+`research/clawd-fan/` (rizowski's GIFs and TB1982's palette-index JSON
+grids, resampled onto the official Clawd's scale; category `fan`) into a single
 `firmware/src/splash_animations.h`:
 
 - frames as bounding-box crops on the shared 55×37 art stage, one byte per
@@ -26,7 +29,8 @@ Soccer Lottie exports read directly) into a single
   sailing-loop cross-match that defines the sailing scene's loop window
 
 See `research/clawd-official/CLAUDE.md` for asset provenance and the format
-details, and `--in` / `--out` to override paths. Rebuild firmware after
+details, `research/clawd-fan/README.md` for the fan-made ones' authors and
+licence status, and `--in` / `--fan` / `--out` to override paths. Rebuild firmware after
 running.
 
 ## Icons

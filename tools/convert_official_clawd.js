@@ -14,9 +14,15 @@
  * cell indexing a ≤16-entry RGB565 palette (index 0 = background), per-frame
  * hold in ms with consecutive duplicate frames collapsed.
  *
- * Requires ImageMagick (`convert`, `identify`) on PATH for GIF decoding.
+ * Fan-made animations (research/clawd-fan/, category "fan") go through the
+ * same pipeline: GIFs authored on the official canvas, and TB1982's
+ * hand-drawn palette-index JSON grids (kind 'grid', resampled onto the
+ * official Clawd's scale). Never mixed into research/clawd-official/.
  *
- * Usage: node convert_official_clawd.js [--in DIR] [--out FILE] [--verify DIR]
+ * GIF decoding uses ImageMagick (`convert`, `identify`) when it is on PATH
+ * and the dependency-free tools/gif_decode.js otherwise.
+ *
+ * Usage: node convert_official_clawd.js [--in DIR] [--fan DIR] [--out FILE] [--verify DIR]
  *   --verify DIR  additionally writes a mid-frame PNG per animation for
  *                 eyeballing against the originals.
  */
@@ -30,6 +36,7 @@ const args = process.argv.slice(2);
 const opt = (k, def) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : def; };
 
 const IN_DIR = path.resolve(opt('--in', path.join(__dirname, '..', 'research', 'clawd-official')));
+const FAN_DIR = path.resolve(opt('--fan', path.join(__dirname, '..', 'research', 'clawd-fan')));
 const OUT_FILE = path.resolve(opt('--out',
   path.join(__dirname, '..', 'firmware', 'src', 'splash_animations.h')));
 const VERIFY_DIR = opt('--verify', null);
@@ -70,6 +77,27 @@ const ANIMS = [
   { file: '7bbe5052.gif',            name: 'sailing loop',  category: 'persona', emit: false },
   { file: 'ac0fa108.gif',            name: 'sailing scene', category: 'persona' },
   { file: 'Clawd-Lurking.gif',       name: 'lurking',       category: 'persona' },
+  // Unlisted official persona GIF (found by name probing).
+  { file: 'Clawd-Book.gif',          name: 'book',          category: 'persona' },
+
+  // ── Fan-made (research/clawd-fan/, see its README for authors) ────────────
+  // rizowski/Clawdmeter: authored on the official 2750x1850 canvas.
+  { file: 'Clawd-Baking.gif',        name: 'baking',        category: 'fan', fan: true },
+  { file: 'Clawd-Eating.gif',        name: 'eating',        category: 'fan', fan: true },
+  // TB1982/Clawdmeter (branch nova): 20x20 palette-index grids, 1 cell = a
+  // finer pixel than the official art's, so GRID20 resamples them onto the
+  // official Clawd's 16x16-cell body. jumping blossom is 40x40 and already
+  // at the official scale (GRID40 just offsets it onto the stage).
+  { file: 'tb1982/idle_blossom.json',   name: 'idle blossom',   category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/idle_hearts.json',    name: 'idle hearts',    category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/fm_listening.json',   name: 'fm listening',   category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/work_out.json',       name: 'work out',       category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/swim_summer.json',    name: 'swim summer',    category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/this_is_fine.json',   name: 'this is fine',   category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/surfing.json',        name: 'surfing',        category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/space.json',          name: 'space',          category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/hanabi.json',         name: 'hanabi',         category: 'fan', fan: true, kind: 'grid', grid: 'GRID20' },
+  { file: 'tb1982/jumping_blossom.json', name: 'jumping blossom', category: 'fan', fan: true, kind: 'grid', grid: 'GRID40' },
 ];
 
 function safeIdent(s) {
@@ -102,7 +130,26 @@ function readPpm(file) {
 
 // ── GIF decoding via ImageMagick ─────────────────────────────────────────────
 
+// ImageMagick if it really is ImageMagick (on Windows `convert` is the disk
+// utility), otherwise the built-in decoder.
+let HAVE_IM = null;
+function haveImageMagick() {
+  if (HAVE_IM === null) {
+    try {
+      HAVE_IM = /ImageMagick/.test(execFileSync('convert', ['-version'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString()) &&
+                /ImageMagick/.test(execFileSync('identify', ['-version'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString());
+    } catch { HAVE_IM = false; }
+  }
+  return HAVE_IM;
+}
+
+function decodeGifBuiltin(file) {
+  const g = require('./gif_decode').decodeGif(fs.readFileSync(file));
+  return g.frames.map(f => ({ w: g.w, h: g.h, data: f.data, holdMs: Math.max((f.delayCs || 8) * 10, 20) }));
+}
+
 function decodeGif(file) {
+  if (!haveImageMagick()) return decodeGifBuiltin(file);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clawd-'));
   try {
     // Flatten transparency onto a magenta sentinel — the GIFs use transparent
@@ -246,6 +293,64 @@ function decodeLottie(file) {
   return { grids, holdsMs: grids.map(() => LOTTIE_HOLD_MS) };
 }
 
+// ── TB1982 hand-drawn grids (palette-index JSON) ─────────────────────────────
+// TB1982's 20x20 drawings use a finer pixel than the official art: his Clawd
+// is 11 cells wide (body) x 10 tall, official Clawd's body is 16x12 cells
+// (2x2-cell eyes and 2-wide legs). To put him at the official scale each
+// source column/row is stretched to a fixed number of stage cells, chosen so
+// the body, arms (4 wide), 2x2 eyes and 4-row legs land exactly on the
+// official silhouette and the pattern is mirror-symmetric about his centre
+// column. Left of col 3 and above row 6 (props) get a rough 1.5x / 2x.
+// x0/y0 put source col 3 / row 6 on the official Clawd's left arm (stage
+// x 15) and top (y 21); his feet end on stage row 36.
+const GRID_SPECS = {
+  GRID20: {
+    cols: [1, 2, 1,  2, 2,  1, 1, 2, 2, 1, 2, 1, 2, 2, 1, 1,  2, 2,  1, 2],
+    rows: [2, 2, 2, 2, 2, 2,  1, 1, 2, 1, 2, 1, 1, 1, 1, 1,  2, 1, 1, 1],
+  },
+  GRID40: { cols: new Array(40).fill(1), rows: new Array(40).fill(1), x0: 7, y0: 5 },
+};
+for (const k of ['GRID20']) {
+  const g = GRID_SPECS[k];
+  g.x0 = 15 - g.cols.slice(0, 3).reduce((a, b) => a + b, 0);
+  g.y0 = 21 - g.rows.slice(0, 6).reduce((a, b) => a + b, 0);
+}
+
+const BODY_RGB = [0xD8, 0x76, 0x56], SHADE_RGB = [0xBE, 0x68, 0x4D];
+
+// Snap the drawn palette's Clawd colours onto the official ones so the
+// palette recolour (theme_clawd_art) and the shared eye ink apply.
+function snapDrawnColor(c) {
+  const d2 = (a, b) => (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2;
+  if (d2(c, BODY_RGB) <= COLOR_MERGE_DIST2) return BODY_RGB.slice();
+  if (d2(c, SHADE_RGB) <= COLOR_MERGE_DIST2) return SHADE_RGB.slice();
+  if (c[0] < 40 && c[1] < 40 && c[2] < 40) return EYE_INK.slice();
+  return c;
+}
+
+function decodeGridJson(file, specName) {
+  const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const spec = GRID_SPECS[specName];
+  const pal = j.palette.map((h, i) => i === 0 ? null : snapDrawnColor(
+    [1, 3, 5].map(o => parseInt(h.slice(o, o + 2), 16))));
+  const sx = [0], sy = [0];
+  for (const w of spec.cols) sx.push(sx[sx.length - 1] + w);
+  for (const h of spec.rows) sy.push(sy[sy.length - 1] + h);
+  const grids = j.frames.map(fr => {
+    if (fr.grid.length !== spec.rows.length || fr.grid[0].length !== spec.cols.length)
+      throw new Error(`${file}: grid is ${fr.grid[0].length}x${fr.grid.length}, expected ${specName}`);
+    const out = Array.from({ length: STAGE_H }, () => Array.from({ length: STAGE_W }, () => [255, 0, 255]));
+    fr.grid.forEach((row, r) => row.forEach((v, c) => {
+      if (!v) return;
+      for (let y = spec.y0 + sy[r]; y < spec.y0 + sy[r + 1]; y++)
+        for (let x = spec.x0 + sx[c]; x < spec.x0 + sx[c + 1]; x++)
+          if (x >= 0 && x < STAGE_W && y >= 0 && y < STAGE_H) out[y][x] = pal[v];
+    }));
+    return out;
+  });
+  return { grids, holdsMs: j.frames.map(fr => Math.max(fr.hold | 0, 20)) };
+}
+
 // ── Palette building + frame quantization ────────────────────────────────────
 
 // The GIFs draw the eyes as transparent holes (the page shows through on
@@ -276,8 +381,10 @@ function inkInteriorHoles(grid, bg) {
       if (samePx(grid[r][c], bg) && !outside[r][c]) grid[r][c] = EYE_INK;
 }
 
-function buildAnim(grids, holdsMs, bg) {
-  for (const grid of grids) inkInteriorHoles(grid, bg);
+function buildAnim(grids, holdsMs, bg, opts = {}) {
+  // Hand-drawn grids place every colour (eyes included) themselves: enclosed
+  // background cells there are real gaps (a swim ring's hole), not eyes.
+  if (!opts.noInk) for (const grid of grids) inkInteriorHoles(grid, bg);
   // Histogram over all sampled colors (excluding background).
   const hist = new Map();
   for (const grid of grids)
@@ -380,6 +487,27 @@ function buildAnim(grids, holdsMs, bg) {
 
 // ── Verification renders ─────────────────────────────────────────────────────
 
+// Minimal RGB PNG writer (zlib is built into Node), for --verify without ImageMagick.
+function encodePng(W, H, rgb) {
+  const zlib = require('zlib');
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0;
+  });
+  const crc = (b) => { let c = 0xFFFFFFFF; for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const chunk = (type, data) => {
+    const t = Buffer.from(type, 'ascii');
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0); t.copy(out, 4); data.copy(out, 8);
+    out.writeUInt32BE(crc(Buffer.concat([t, data])), 8 + data.length);
+    return out;
+  };
+  const raw = Buffer.alloc((W * 3 + 1) * H);
+  for (let y = 0; y < H; y++) { raw[y * (W * 3 + 1)] = 0; rgb.copy(raw, y * (W * 3 + 1) + 1, y * W * 3, (y + 1) * W * 3); }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
 function writeVerifyPng(anim, ident, dir) {
   const scale = 8;
   const { w, h, frames, palette } = anim;
@@ -395,10 +523,15 @@ function writeVerifyPng(anim, ident, dir) {
     }
   const tmp = path.join(dir, `${ident}.ppm`);
   fs.writeFileSync(tmp, Buffer.concat([Buffer.from(ppm), buf]));
-  try {
-    execFileSync('convert', [tmp, path.join(dir, `${ident}.png`)]);
-    fs.rmSync(tmp);
-  } catch { /* leave the .ppm if ImageMagick is unavailable */ }
+  if (haveImageMagick()) {
+    try {
+      execFileSync('convert', [tmp, path.join(dir, `${ident}.png`)]);
+      fs.rmSync(tmp);
+      return;
+    } catch { /* fall through to the built-in writer */ }
+  }
+  fs.rmSync(tmp);
+  fs.writeFileSync(path.join(dir, `${ident}.png`), encodePng(W, H, buf));
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -419,7 +552,7 @@ function main() {
   out += `#define SPLASH_PALETTE_SIZE ${PALETTE_SIZE}\n\n`;
   out += 'typedef struct {\n';
   out += '    const char *name;\n';
-  out += '    const char *category;      // "core" | "persona"\n';
+  out += '    const char *category;      // "core" | "persona" | "fan" (fan-made)\n';
   out += '    uint8_t  w, h;             // frame size, cells\n';
   out += '    uint8_t  ox, oy;           // crop origin on the 55x37 stage\n';
   out += '    uint16_t frame_count;\n';
@@ -434,13 +567,17 @@ function main() {
   let totalBytes = 0;
 
   for (const meta of ANIMS) {
-    const src = path.join(IN_DIR, meta.file);
+    const src = path.join(meta.fan ? FAN_DIR : IN_DIR, meta.file);
     if (!fs.existsSync(src)) {
-      console.error(`missing ${src} — run research/clawd-official/fetch.sh`);
+      console.error(`missing ${src} — ` + (meta.fan ? 'see research/clawd-fan/README.md'
+                                                      : 'run research/clawd-official/fetch.sh'));
       process.exit(1);
     }
     let anim;
-    if (meta.kind === 'lottie') {
+    if (meta.kind === 'grid') {
+      const { grids, holdsMs } = decodeGridJson(src, meta.grid);
+      anim = buildAnim(grids, holdsMs, [255, 0, 255], { noInk: true });
+    } else if (meta.kind === 'lottie') {
       const { grids, holdsMs } = decodeLottie(src);
       anim = buildAnim(grids, holdsMs, [255, 0, 255]);
     } else {
@@ -553,7 +690,7 @@ function main() {
     const cellBytes = anim.frames.length * anim.w * anim.h;
     totalBytes += cellBytes;
     console.log(`${meta.name.padEnd(14)} ${String(anim.w).padStart(2)}x${String(anim.h).padEnd(2)} ` +
-      `${String(anim.frames.length).padStart(3)} frames (${meta.kind === 'lottie' ? 'lottie' : 'gif'}, ` +
+      `${String(anim.frames.length).padStart(3)} frames (${meta.kind || 'gif'}${meta.fan ? ', fan' : ''}, ` +
       `${anim.palette.length} colors, ${(cellBytes / 1024).toFixed(1)} KB)`);
 
     if (anim.palette.length > PALETTE_SIZE)
