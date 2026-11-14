@@ -14,5 +14,86 @@
     "ms": 5920,
     "colours": 11,
     "kb": 29.9
+  },
+  {
+    "file": "Clawd-ZedsDead.gif",
+    "name": "zed's dead",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      18
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The chopper getaway from Pulp Fiction (1994): slicked-back hair, leather jacket, a raked chopper with ape-hanger bars, and the line \"Zed's dead\" as a two-word caption.",
+    "frames": 27,
+    "ms": 5220,
+    "colours": 13,
+    "kb": 40.3
+  },
+  {
+    "file": "Clawd-BulletTime.gif",
+    "name": "bullet time",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      14
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The slow-motion bullet dodge from The Matrix (1999): tiny black shades, long black coat, falling green code, bullets crawling past with ripples in the air.",
+    "frames": 24,
+    "ms": 5580,
+    "colours": 12,
+    "kb": 36.6
+  },
+  {
+    "file": "Clawd-LavaThumbs.gif",
+    "name": "thumbs up in lava",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      12,
+      15
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The thumbs-up in molten steel from Terminator 2 (1991): leather jacket, dark shades, a slow sink with one hand left giving a thumbs-up. Cartoon slapstick: he pops back out fine.",
+    "frames": 28,
+    "ms": 7490,
+    "colours": 13,
+    "kb": 37.7
+  },
+  {
+    "file": "Clawd-MoonBike.gif",
+    "name": "moon bike",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      10,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The bicycle flying across the full moon from E.T. the Extra-Terrestrial (1982): red hoodie, a BMX with a front basket and a blanket bundle, the silhouette against a giant moon. No character is drawn.",
+    "frames": 24,
+    "ms": 5610,
+    "colours": 15,
+    "kb": 38.7,
+    "notes": "Deliberate exception to the orange-body rule: while he crosses the moon, the cells of him in front of it are drawn as a dark silhouette; everywhere else he keeps his normal colours."
+  },
+  {
+    "file": "Clawd-BatCountry.gif",
+    "name": "bat country",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      10,
+      13
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The desert drive from Fear and Loathing in Las Vegas (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats and the two-word caption \"bat country\".",
+    "frames": 21,
+    "ms": 4410,
+    "colours": 16,
+    "kb": 38
   }
 ]
