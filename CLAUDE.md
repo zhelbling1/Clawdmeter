@@ -102,7 +102,8 @@ the app or run it with `CLAWDMETER_USB=0` first.
   (heartbeats and writes between polls): the rate math and reset detector skip
   them, but a new `es` in the same write still fires.
 - Device settings, on every data payload: `k1`/`k2`/`k3` (what the
-  primary, secondary and PWR buttons do: presets 0–6, keyboard shortcuts
+  primary, secondary and PWR buttons do: presets 0–8 (7 / 8 next / previous
+  animation, on the device), keyboard shortcuts
   and media keys as bit fields, `button_action.h`), `lv` (liveliness 1–5), `aa`
   (attention animation seconds: 120, 30, 10, 0 = off; only his animation,
   not the alert), `pm` (pace marker on the usage bars, `pace.h`) and `th`

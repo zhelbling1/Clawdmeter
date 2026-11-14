@@ -386,9 +386,36 @@ void mascot_autonomy(bool on) {
     if (on && mode == M_SEATED) seated_since = millis();
 }
 
-bool mascot_act(const char* name, uint8_t times, bool snappy, uint16_t speed_pct) {
+// An act that plays as itself in the seat: no taller than the headroom
+// above it, and one the corner buffer holds.
+static bool act_fits(const ClawdAnim* a) {
+    return a && feet_y - a->h * cell >= 0 && corner_bytes(a) <= buf_bytes;
+}
+
+static const ClawdAnim* cycle_act(int i) {
+    if (!img) return NULL;
+    for (const char* n : CORNER_ANIMS) {
+        if (strcmp(n, "walking") == 0) continue;      // his gait, not an act
+        const ClawdAnim* a = clawd_anim(n);
+        if (act_fits(a) && i-- == 0) return a;
+    }
+    return NULL;
+}
+
+int mascot_cycle_count(void) {
+    int n = 0;
+    while (cycle_act(n)) n++;
+    return n;
+}
+
+const char* mascot_cycle_name(int i) {
+    const ClawdAnim* a = i >= 0 ? cycle_act(i) : NULL;
+    return a ? a->name : NULL;
+}
+
+bool mascot_act(const char* name, uint8_t times, bool snappy, uint16_t speed_pct, bool cut) {
     if (!img || minimal) return false;
-    if (!(mode == M_SEATED || (mode == M_ACT && act_auto))) return false;
+    if (!(mode == M_SEATED || (mode == M_ACT && (act_auto || cut)))) return false;
     const ClawdAnim* a = clawd_anim(name);
     if (!a) return false;
     if (feet_y - a->h * cell < 0) {

@@ -40,3 +40,8 @@ void ui_set_pair_hint(PairHint hint);
 // Attention message on the status line (scrolls when long); NULL clears it
 // and the whimsical status line resumes.
 void ui_set_alert_text(const char* message);
+
+// A short note on the status line in place of the thinking verb (the name of
+// the animation a button picked); NULL clears it. An alert outranks it, and
+// it's back once the alert ends if it's still set. Not in minimal mode.
+void ui_set_status_note(const char* text);

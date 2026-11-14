@@ -93,6 +93,7 @@ const ASSETS: &[(&str, &[u8])] = bundled![
         "refresh-cw",
         "x",
         "chevron-right",
+        "chevron-left",
         "chevron-down",
         "check",
         "mic",

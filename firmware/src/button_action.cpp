@@ -37,6 +37,8 @@ ButtonBinding button_action_decode(int32_t v) {
         case BTN_ACT_ENTER:      return key(0x28, 0x00, false);
         case BTN_ACT_ESCAPE:     return key(0x29, 0x00, false);
         case BTN_ACT_BRIGHTNESS: b.kind = BTN_KIND_BRIGHTNESS; return b;
+        case BTN_ACT_NEXT_ANIM:  b.kind = BTN_KIND_NEXT_ANIM; return b;
+        case BTN_ACT_PREV_ANIM:  b.kind = BTN_KIND_PREV_ANIM; return b;
         default: break;
     }
     if (v & BTN_ACT_KEY_FLAG) {
@@ -46,6 +48,11 @@ ButtonBinding button_action_decode(int32_t v) {
     b.consumer = (uint16_t)(v & 0xFFF);
     b.repeat = b.consumer == HID_CONSUMER_VOL_UP || b.consumer == HID_CONSUMER_VOL_DOWN;
     return b;
+}
+
+int button_action_anim_step(int32_t v) {
+    const uint8_t kind = button_action_decode(v).kind;
+    return kind == BTN_KIND_NEXT_ANIM ? +1 : kind == BTN_KIND_PREV_ANIM ? -1 : 0;
 }
 
 void keyboard_report(const KeyboardHeld* held, uint8_t extra_mods, uint8_t extra_key, uint8_t out[8]) {

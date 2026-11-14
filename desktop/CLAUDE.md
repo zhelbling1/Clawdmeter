@@ -84,7 +84,9 @@ is faked behind `FlashHardware`.
   seconds), `pace_marker` (default off, sent as `pm`), `button_primary`
   (default `space`), `button_secondary` (default `shift-tab`) and
   `button_pwr` (default `brightness`): `none`, `space`, `shift-tab`, `tab`,
-  `enter`, `escape`, `brightness`, a media key (`play-pause`,
+  `enter`, `escape`, `brightness`, `next-animation` / `previous-animation`
+  (on-device: Clawd plays the next / previous scene of his cycle, `k` 7 /
+  8; also `next-anim`, `prev-anim`), a media key (`play-pause`,
   `previous-track`, `next-track`, `volume-down`, `volume-up`, `mute`) or a
   shortcut, modifiers and a key joined by `+` with an optional `hold`
   (`ctrl+shift+m`, `super+alt+k`, `ctrl+space hold`; `tap` marks one

@@ -23,6 +23,25 @@ static void test_presets(void) {
     assert_key(BTN_ACT_ESCAPE, 0x29, 0x00, false);
     TEST_ASSERT_EQUAL(BTN_KIND_NONE, button_action_decode(BTN_ACT_NONE).kind);
     TEST_ASSERT_EQUAL(BTN_KIND_BRIGHTNESS, button_action_decode(BTN_ACT_BRIGHTNESS).kind);
+    TEST_ASSERT_EQUAL(BTN_KIND_NEXT_ANIM, button_action_decode(BTN_ACT_NEXT_ANIM).kind);
+    TEST_ASSERT_EQUAL(BTN_KIND_PREV_ANIM, button_action_decode(BTN_ACT_PREV_ANIM).kind);
+}
+
+// Next / previous animation: on the device, no HID report. The wire values
+// are fixed (the app sends 7 and 8; firmware before them ignores both).
+static void test_animation_presets(void) {
+    TEST_ASSERT_EQUAL(7, BTN_ACT_NEXT_ANIM);
+    TEST_ASSERT_EQUAL(8, BTN_ACT_PREV_ANIM);
+    TEST_ASSERT_TRUE(button_action_valid(7));
+    TEST_ASSERT_TRUE(button_action_valid(8));
+    TEST_ASSERT_EQUAL(7, button_action_clamp(7, BTN_ACT_SPACE));
+    TEST_ASSERT_EQUAL(+1, button_action_anim_step(BTN_ACT_NEXT_ANIM));
+    TEST_ASSERT_EQUAL(-1, button_action_anim_step(BTN_ACT_PREV_ANIM));
+    const int32_t others[] = { BTN_ACT_NONE, BTN_ACT_SPACE, BTN_ACT_BRIGHTNESS, 0x10307, 0x200B5, 9, -1 };
+    for (int32_t v : others) TEST_ASSERT_EQUAL(0, button_action_anim_step(v));
+    const ButtonBinding b = button_action_decode(BTN_ACT_NEXT_ANIM);
+    TEST_ASSERT_EQUAL(0, b.key);
+    TEST_ASSERT_EQUAL(0, b.consumer);
 }
 
 static void test_chords(void) {
@@ -51,7 +70,7 @@ static void test_consumer(void) {
 
 static void test_invalid(void) {
     const int32_t bad[] = {
-        -1, 7, 99, 0xFFFF,
+        -1, 9, 99, 0xFFFF,
         0x10000,                       // keyboard, usage 0
         0x10000 | 0x03,                // keyboard error usage
         0x10000 | 0x74,                // past F24
@@ -97,6 +116,7 @@ static void test_keyboard_report(void) {
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_presets);
+    RUN_TEST(test_animation_presets);
     RUN_TEST(test_chords);
     RUN_TEST(test_consumer);
     RUN_TEST(test_invalid);

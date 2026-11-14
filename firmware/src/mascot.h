@@ -43,8 +43,17 @@ void mascot_set_working(bool on);
 // too tall for the headroom above the seat plays a shorter official act.
 // snappy: skip the idle lead-in frame (every act opens on the idle pose, held
 // ~330 ms) so a reaction to a tap shows on the next frame. speed_pct scales
-// the authored timing (a startle plays a little quick).
-bool mascot_act(const char* anim, uint8_t times, bool snappy = false, uint16_t speed_pct = 100);
+// the authored timing (a startle plays a little quick). cut: a commanded act
+// playing in the seat is cut short for this one too (a button browsing the
+// acts), not just an idle act.
+bool mascot_act(const char* anim, uint8_t times, bool snappy = false, uint16_t speed_pct = 100,
+                bool cut = false);
+// The corner acts a "next / previous animation" button cycles through on a
+// board without the performer: the acts the corner buffer is sized for that
+// play as themselves in this seat (they fit the headroom above it), in
+// their listed order, without the walk.
+int         mascot_cycle_count(void);
+const char* mascot_cycle_name(int i);   // NULL out of range
 void mascot_leave(uint16_t speed_pct);                 // walk off the nearest edge (a lurk finishes, no slower, and he stays out)
 void mascot_return(int from_side, uint16_t speed_pct); // -1 left / +1 right edge → seat
 // Something to react to while he's out of his seat: cut a lurk trip short

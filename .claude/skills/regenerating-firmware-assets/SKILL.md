@@ -64,7 +64,7 @@ afterwards and check the new or changed animation in the simulator.
 
 Clawd sprites come from the official art and the credited fan-made art in
 `research/clawd-fan/`: don't draw or retouch sprite frames by hand. A new
-animation also needs a group in `performer.cpp` (`GROUP_NAMES`, and
+animation also needs a group in `anim_sets.cpp` (`GROUP_NAMES`, and
 `CALM_NAMES` for calm dips); a corner act must sit on the seated Clawd's left
 edge (ox 15) within the buffer `CORNER_ANIMS` in `mascot.cpp` sizes. To find new official animations, use the
 `hunting-clawd-animations` skill.

@@ -310,8 +310,9 @@ Click one to change it:
 - **Media**: Play/Pause, Previous, Next, Volume down, Volume up or Mute.
   Volume repeats while you hold the button.
 - **Other**: **Brightness** cycles the screen brightness, so a board without
-  a PWR button can have one; **Nothing** leaves the button to wake the
-  screen.
+  a PWR button can have one; **Previous animation** and **Next animation**
+  make Clawd play one of his animations (below); **Nothing** leaves the
+  button to wake the screen.
 - **Shortcut**: a keyboard shortcut of your own. Click the shortcut field
   (or Record) and press the keys, such as Ctrl+Shift+M or Cmd+Shift+M for
   Teams mute, Alt+A for Zoom, or Win+Alt+K for the Windows 11 microphone.
@@ -320,6 +321,29 @@ Click one to change it:
   shortcuts your system keeps to itself while recording. **Hold while
   pressed** keeps the keys down while you hold the button, for push to talk
   such as Teams' Ctrl+Space; otherwise they are tapped.
+
+#### Browsing Clawd's animations
+
+To flip through everything Clawd can do, open **Controls**, set **Left** to
+**Previous animation** and **Right** to **Next animation** (Other section;
+any button works, PWR included). These work over USB alone: nothing is sent
+to the computer, so the board doesn't need to be paired for them.
+
+A press on the meters sends Clawd out of his seat; he walks back on full
+size and plays the next animation, with its name on the status line for a
+few seconds, then walks off and sits back down. Press again while he's
+playing to go straight to the next (or previous) one. The order is the
+official animations first, then the fan-made ones, then the clawd-tank set;
+it wraps around, and the board remembers where you were until it restarts.
+The first Next plays the first one, the first Previous the last.
+
+If the screensaver or pet mode is up, the first press brings him back to the
+meters; press again to play. During an alert, on the Clawd page or while the
+face is up after a tap, the press does nothing else. It plays even at the
+lowest **Animation silliness**, since you asked. On boards that can't show
+him full size (no PSRAM, other than the ESP32-C6 AMOLED-2.16), he plays his
+seated animations instead. Older firmware ignores these settings and keeps
+the button's previous action, so update the firmware from **Flash** first.
 
 PWR can only tap: a short press registers when you let go, so it has no
 Hold switch, and volume doesn't repeat on it. Holding PWR to clear the

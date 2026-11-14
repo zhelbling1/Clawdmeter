@@ -33,6 +33,9 @@ OnScreen fake_on_screen(void);
 bool     fake_corner_seated_still(void);   // in his seat, not acting or walking
 bool     fake_corner_acting(void);         // playing a commanded or idle act in his seat
 extern const char* fake_last_act;          // the last act mascot_act accepted
+extern int         fake_last_scene;        // the last performer_perform's animation index
+extern int         fake_scenes;            // performer_perform calls
+extern const char* fake_status_note;       // ui_set_status_note's text, NULL when cleared
 
 // Pet mode, the party and the effect screensavers (pet.h, party.h, savers.h).
 #define FAKE_HEADER_H 60                   // ui_header_hit: y above this

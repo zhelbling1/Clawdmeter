@@ -459,6 +459,11 @@ pub enum ButtonAction {
     Escape,
     /// Cycle the screen brightness.
     Brightness,
+    /// Clawd plays the next animation of his cycle, on the device (no key
+    /// press).
+    NextAnimation,
+    /// Clawd plays the previous animation of his cycle.
+    PreviousAnimation,
     /// A media key.
     Media(MediaKey),
     /// A recorded keyboard shortcut.
@@ -469,6 +474,11 @@ impl ButtonAction {
     /// The single keys the Device page offers, in its order.
     pub const KEYS: [ButtonAction; 5] =
         [ButtonAction::Space, ButtonAction::ShiftTab, ButtonAction::Tab, ButtonAction::Enter, ButtonAction::Escape];
+
+    /// What the board itself does, in the Device page's order (after them,
+    /// Nothing).
+    pub const DEVICE: [ButtonAction; 3] =
+        [ButtonAction::Brightness, ButtonAction::PreviousAnimation, ButtonAction::NextAnimation];
 
     /// Parse a config value; anything unknown is `default`. A shortcut is
     /// modifiers and a key joined by `+`, then `hold` (keys stay down while
@@ -501,6 +511,8 @@ impl ButtonAction {
             "enter" => ButtonAction::Enter,
             "escape" | "esc" => ButtonAction::Escape,
             "brightness" => ButtonAction::Brightness,
+            "next-animation" | "next-anim" => ButtonAction::NextAnimation,
+            "previous-animation" | "previous-anim" | "prev-animation" | "prev-anim" => ButtonAction::PreviousAnimation,
             _ => ButtonAction::Media(MediaKey::parse(v)?),
         })
     }
@@ -515,6 +527,8 @@ impl ButtonAction {
             ButtonAction::Enter => "enter".into(),
             ButtonAction::Escape => "escape".into(),
             ButtonAction::Brightness => "brightness".into(),
+            ButtonAction::NextAnimation => "next-animation".into(),
+            ButtonAction::PreviousAnimation => "previous-animation".into(),
             ButtonAction::Media(m) => m.as_str().into(),
             ButtonAction::Chord(c) => {
                 let combo = c.combo();
@@ -539,14 +553,18 @@ impl ButtonAction {
             ButtonAction::Enter => "Enter".into(),
             ButtonAction::Escape => "Esc".into(),
             ButtonAction::Brightness => "Brightness".into(),
+            ButtonAction::NextAnimation => "Next animation".into(),
+            ButtonAction::PreviousAnimation => "Previous animation".into(),
             ButtonAction::Media(m) => m.label().into(),
             ButtonAction::Chord(c) => c.label(style),
         }
     }
 
     /// The payload's `k1` / `k2` / `k3` value (`firmware/src/button_action.h`):
-    /// a preset 0–6; a shortcut `0x10000 | hold << 12 | mods << 8 | usage`;
-    /// a media key `0x20000 | usage`.
+    /// a preset 0–8 (7 and 8, the animations, are ignored by firmware older
+    /// than them, which keeps the button's stored action); a shortcut
+    /// `0x10000 | hold << 12 | mods << 8 | usage`; a media key
+    /// `0x20000 | usage`.
     pub fn code(self) -> u32 {
         match self {
             ButtonAction::None => 0,
@@ -556,6 +574,8 @@ impl ButtonAction {
             ButtonAction::Enter => 4,
             ButtonAction::Escape => 5,
             ButtonAction::Brightness => 6,
+            ButtonAction::NextAnimation => 7,
+            ButtonAction::PreviousAnimation => 8,
             ButtonAction::Media(m) => CONSUMER_FLAG | u32::from(m.usage()),
             ButtonAction::Chord(c) => {
                 KEY_FLAG | if c.hold { HOLD_BIT } else { 0 } | u32::from(c.mods & 0x0F) << 8 | u32::from(c.usage)
@@ -582,8 +602,10 @@ mod tests {
             ButtonAction::Enter,
             ButtonAction::Escape,
             ButtonAction::Brightness,
+            ButtonAction::NextAnimation,
+            ButtonAction::PreviousAnimation,
         ];
-        assert_eq!(presets.map(ButtonAction::code), [0, 1, 2, 3, 4, 5, 6], "never renumbered");
+        assert_eq!(presets.map(ButtonAction::code), [0, 1, 2, 3, 4, 5, 6, 7, 8], "never renumbered");
         // The values test_button_action and test_payload decode.
         assert_eq!(chord(MOD_CTRL | MOD_SHIFT, 0x10, false).code(), 0x10310, "Ctrl+Shift+M");
         assert_eq!(chord(MOD_CTRL, 0x2C, true).code(), 0x1112C, "Ctrl+Space, held");
@@ -608,6 +630,8 @@ mod tests {
             ButtonAction::Enter,
             ButtonAction::Escape,
             ButtonAction::Brightness,
+            ButtonAction::NextAnimation,
+            ButtonAction::PreviousAnimation,
             chord(MOD_CTRL | MOD_SHIFT, 0x10, false),
             chord(MOD_CTRL, 0x2C, true),
             chord(MOD_GUI | MOD_ALT, 0x0E, false),
@@ -625,6 +649,8 @@ mod tests {
         assert_eq!(chord(0, 0x2C, false).as_str(), "space tap");
         assert_eq!(chord(MOD_SHIFT, 0x2B, false).as_str(), "shift+tab tap");
         assert_eq!(chord(MOD_CTRL, 0x2D, false).as_str(), "ctrl+minus");
+        assert_eq!(ButtonAction::NextAnimation.as_str(), "next-animation");
+        assert_eq!(ButtonAction::PreviousAnimation.as_str(), "previous-animation");
     }
 
     #[test]
@@ -638,6 +664,9 @@ mod tests {
         assert_eq!(ButtonAction::parse("f13", d), chord(0, 0x68, false));
         assert_eq!(ButtonAction::parse("esc", d), ButtonAction::Escape);
         assert_eq!(ButtonAction::parse("next", d), ButtonAction::Media(MediaKey::Next));
+        assert_eq!(ButtonAction::parse("Next-Animation", d), ButtonAction::NextAnimation);
+        assert_eq!(ButtonAction::parse("prev-anim", d), ButtonAction::PreviousAnimation);
+        assert_eq!(ButtonAction::parse("next-animation hold", d), d, "an animation isn't a key to hold");
         for bad in ["", "bogus", "ctrl+", "ctrl+shift", "hyper+a", "a hold tap", "a sometimes", "ctrl+f25", "+"] {
             assert_eq!(ButtonAction::parse(bad, d), d, "{bad:?}");
         }
@@ -689,5 +718,37 @@ mod tests {
         assert_eq!(LabelStyle::Linux.prefix(0), "");
         assert_eq!(ButtonAction::ShiftTab.label(LabelStyle::Mac), "Shift+Tab");
         assert_eq!(ButtonAction::Media(MediaKey::VolumeUp).label(LabelStyle::Mac), "Vol +");
+        assert_eq!(ButtonAction::NextAnimation.label(LabelStyle::Windows), "Next animation");
+        assert_eq!(ButtonAction::PreviousAnimation.label(LabelStyle::Linux), "Previous animation");
+    }
+
+    /// The presets' codes are the firmware's `ButtonPreset` values
+    /// (`firmware/src/button_action.h`).
+    #[test]
+    fn presets_match_firmware_enum() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../firmware/src/button_action.h");
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            eprintln!("firmware source not found at {}; skipping", path.display());
+            return;
+        };
+        let value = |name: &str| -> u32 {
+            let line = src.lines().find(|l| l.trim_start().starts_with(name)).unwrap_or_else(|| panic!("{name}"));
+            let v = line.split('=').nth(1).and_then(|r| r.split(',').next()).unwrap_or_else(|| panic!("{line}"));
+            v.trim().parse().unwrap_or_else(|_| panic!("{line}"))
+        };
+        let pairs = [
+            ("BTN_ACT_NONE ", ButtonAction::None),
+            ("BTN_ACT_SPACE ", ButtonAction::Space),
+            ("BTN_ACT_SHIFT_TAB ", ButtonAction::ShiftTab),
+            ("BTN_ACT_TAB ", ButtonAction::Tab),
+            ("BTN_ACT_ENTER ", ButtonAction::Enter),
+            ("BTN_ACT_ESCAPE ", ButtonAction::Escape),
+            ("BTN_ACT_BRIGHTNESS ", ButtonAction::Brightness),
+            ("BTN_ACT_NEXT_ANIM ", ButtonAction::NextAnimation),
+            ("BTN_ACT_PREV_ANIM ", ButtonAction::PreviousAnimation),
+        ];
+        for (name, a) in pairs {
+            assert_eq!(value(name), a.code(), "{name}");
+        }
     }
 }

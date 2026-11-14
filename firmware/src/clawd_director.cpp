@@ -1,6 +1,7 @@
 #include "clawd_director.h"
 #include "clawd_policy.h"
 #include "clawd_anim.h"
+#include "anim_sets.h"
 #include "mascot.h"
 #include "performer.h"
 #include "face.h"
@@ -36,10 +37,11 @@ enum Beat {
     B_PEEK,          // a tap on the meters: hop, duck out, the face comes up curious for a while
     B_PET,           // a tap on the header: duck out, the face comes up to be petted (pet.h)
     B_PAGE,          // the Clawd page has him (pages.h): nothing on the meters moves
+    B_BROWSE,        // a next / previous animation button: off, one scene full size, home
 };
 static const char* const BEAT_NAMES[] = {
     "home", "corner", "show", "screensaver", "face-home", "run-home", "attention", "peek", "pet",
-    "page",
+    "page", "browse",
 };
 
 static Beat     beat = B_HOME;
@@ -95,11 +97,20 @@ static int         saver_style = 0;
 static int         saver_turn = 0;
 static uint32_t    saver_since = 0;
 
+// A next / previous animation button (browse_press): where it is in the
+// cycle (anim_sets.h, or mascot_cycle_name without the performer), -1 before
+// the first press; RAM only.
+static int         browse_cursor = -1;
+static uint32_t    browse_label_until = 0;
+static uint32_t    browse_since = 0;
+#define BROWSE_PCT 250                        // off and on quick: you asked for it
+
 static uint32_t now_ms(void) { return millis(); }
 
 static void go(Beat b) {
     if (beat == B_PET && b != B_PET) pet_leave();   // props off, eyes back, before the face drops
     if (beat == B_SCREENSAVER && b != B_SCREENSAVER) saver_stop();
+    if (beat == B_BROWSE && b != B_BROWSE) { ui_set_status_note(NULL); browse_label_until = 0; }
     if (b == B_SCREENSAVER && beat != B_SCREENSAVER) {
         saver_style = saver_turn;
         saver_turn = (saver_turn + 1) % (SAVER_COUNT + 1);
@@ -172,7 +183,7 @@ static void to_meters(bool noticed) {
         go(B_FACE_HOME);
     } else if (performing) {
         go(B_RUN_HOME);
-    } else if (beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PET) {
+    } else if (beat == B_SHOW || beat == B_BROWSE || beat == B_SCREENSAVER || beat == B_PET) {
         // Still on the meters (pointing / walking off, or an effect
         // screensaver: go() takes it down as he turns around): turn around.
         if (attention_on) { go(B_ATTENTION); return; }
@@ -317,14 +328,61 @@ void director_tap(int x, int y) {
 
 void director_set_pairing_touch(bool on) { pairing_touch = on; }
 
-bool director_button(bool main_button) {
+// ─── Browsing the animations (a next / previous animation button) ───────────
+// The cycle is the performer's (anim_sets.h) where there is one, else the
+// corner acts that fit his seat.
+static int browse_count(void) { return performer_available() ? anim_cycle_count() : mascot_cycle_count(); }
+static const char* browse_name(int i) {
+    return performer_available() ? anim_cycle_name(i) : mascot_cycle_name(i);
+}
+
+static void browse_label(const char* name) {
+    ui_set_status_note(name);
+    browse_label_until = now_ms() + clawd_tuning().browse_label_ms;
+    if (!browse_label_until) browse_label_until = 1;
+}
+
+// `was` is the beat before the press did what any button does (the
+// screensaver and pet mode go home first, director_button): the press only
+// starts one from the meters (home, a corner act, a show) and skips ahead in
+// one already playing. Liveliness doesn't gate it: you asked for it.
+static void browse_press(Beat was, int dir) {
+    if (minimal || attention_on) return;      // an alert outranks it; the press is just you being here
+    if (was != B_HOME && was != B_CORNER && was != B_SHOW && was != B_BROWSE) return;
+    if (beat != was) return;                  // this press already sent him somewhere
+    const int n = browse_count();
+    if (n <= 0) return;
+    browse_cursor = anim_cycle_step(browse_cursor, n, dir);
+    const char* name = browse_name(browse_cursor);
+    Serial.printf("[%lu] director: %s animation -> %s\n", (unsigned long)now_ms(), dir > 0 ? "next" : "previous",
+                  name ? name : "?");
+    if (beat != B_BROWSE) {
+        react_anim = NULL;                    // he's off to perform; a queued corner reaction is moot
+        go(B_BROWSE);                         // step 0: he leaves his seat (corner-only: heads home)
+    }
+    if (performer_available()) {
+        if (!performing) return;              // still on his way out or in: the scene is read when he's home
+        // On stage already (a browse scene, a show, walking on or off):
+        // straight to this one, no walk-off and walk-on between. A scene
+        // stops on the idle pose where it is; a walker walks home first.
+        performer_walk_home(BROWSE_PCT);
+        step = 2;
+        wait_until = now_ms();
+        return;
+    }
+    if (step == 2 && mascot_act(name, 1, false, 100, true)) browse_label(name);   // acting: cut to this one
+}
+
+bool director_button(bool main_button, int anim_step) {
     engage();
     if (main_button && attention_on && !board_caps().has_touch) {
         end_attention(ATTN_END_TAP);          // nothing to tap: BOOT dismisses it
         return true;
     }
     resume_screensaver = false;
+    const Beat was = beat;
     if (beat == B_SCREENSAVER || beat == B_PET) to_meters(false);
+    if (anim_step) browse_press(was, anim_step);
     return false;
 }
 
@@ -730,6 +788,68 @@ static void run_peek(uint32_t now) {
     }
 }
 
+// A next / previous animation button (browse_press). Full size: he leaves
+// his seat, walks on, plays the scene browse_cursor names, walks off and the
+// corner Clawd walks home; a press while he's on stage skips straight to the
+// next scene. Without the performer: back to his seat if he's out, then the
+// corner act, in his seat.
+static void run_browse_corner(uint32_t now) {
+    switch (step) {
+    case 0:   // out (a lurk trip, walking home): back to his seat first
+        browse_since = now;
+        if (!mascot_seated() && !mascot_acting()) mascot_hurry_home();
+        next_step();
+        break;
+    case 1: {
+        const char* name = browse_name(browse_cursor);
+        if (name && mascot_act(name, 1, false, 100, true)) { browse_label(name); next_step(); return; }
+        if (!name || !reaction_still_due(browse_since, now, &clawd_tuning())) go(B_HOME);   // never got home
+        break;
+    }
+    default:
+        if (settled(now)) go(B_HOME);
+        break;
+    }
+}
+
+static void run_browse(uint32_t now) {
+    if (browse_label_until && (int32_t)(now - browse_label_until) >= 0) {
+        browse_label_until = 0;
+        ui_set_status_note(NULL);             // the name was up long enough
+    }
+    if (!performer_available()) { run_browse_corner(now); return; }
+    switch (step) {
+    case 0:  // steps out through the nearest edge (a lurk trip finishes its peek, out)
+        mascot_leave(BROWSE_PCT);
+        next_step();
+        break;
+    case 1:  // gone: he walks on, full size
+        if (!mascot_away()) return;
+        perform_enter(BROWSE_PCT);
+        next_step();
+        break;
+    case 2: {  // home on the meters: the scene the cursor names
+        if (!settled(now)) return;
+        const char* name = browse_name(browse_cursor);
+        performer_perform(clawd_anim_index(name), clawd_tuning().browse_scene_ms);
+        browse_label(name);
+        next_step();
+        break;
+    }
+    case 3:  // played out: off he goes
+        if (!settled(now)) return;
+        performer_walk_off(PERFORMER_LEFT, 150);
+        next_step();
+        break;
+    default:  // off the edge: the corner Clawd comes back in from there
+        if (performer_visible()) return;
+        performing = false;
+        mascot_return(-1, 150);
+        go(B_CORNER);
+        break;
+    }
+}
+
 static void run_corner(uint32_t now) {
     if (react_anim) {
         if (!reaction_still_due(react_at, now, &clawd_tuning())) {
@@ -772,7 +892,8 @@ bool director_page_open(void) {
     // The tap-peek's face is curious about you: buttons and PWR don't drop it
     // (only a tap, attention or its own timeout do), so PWR opens nothing here.
     if (beat == B_PEEK) return false;
-    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PET) {
+    if (face_visible() || performing || beat == B_SHOW || beat == B_BROWSE || beat == B_SCREENSAVER ||
+        beat == B_PET) {
         engage();
         resume_screensaver = false;
         to_meters(false);                     // "show me the meters" first
@@ -854,6 +975,7 @@ void director_tick(void) {
     case B_PEEK:        run_peek(now); break;
     case B_PET:         run_pet(now); break;
     case B_PAGE:        run_page(now); break;
+    case B_BROWSE:      run_browse(now); break;
     }
 }
 
@@ -892,6 +1014,10 @@ bool director_debug(const char* name) {
         return true;
     }
     if (strcmp(name, "confetti") == 0) { party_confetti(); return true; }
+    if (strcmp(name, "next") == 0 || strcmp(name, "prev") == 0) {   // a next / previous animation button
+        director_button(false, name[0] == 'n' ? +1 : -1);
+        return beat == B_BROWSE;
+    }
     if (strncmp(name, "peek", 4) == 0) {  // the peek now, as a tap at x would; `clawd peek <x>`
         if (beat != B_HOME && beat != B_CORNER) return false;
         const int x = name[4] == ' ' ? atoi(name + 5) : lv_display_get_horizontal_resolution(NULL) * 3 / 4;

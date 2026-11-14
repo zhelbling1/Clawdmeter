@@ -75,14 +75,21 @@ void mascot_autonomy(bool on) { m_autonomy = on; if (on && m_mode == M_SEATED) m
 
 const char* fake_last_act = NULL;
 
-bool mascot_act(const char* name, uint8_t times, bool, uint16_t speed_pct) {
+bool mascot_act(const char* name, uint8_t times, bool, uint16_t speed_pct, bool cut) {
     if (m_minimal) return false;
-    if (!(m_mode == M_SEATED || (m_mode == M_ACT && m_act_auto))) return false;
+    if (!(m_mode == M_SEATED || (m_mode == M_ACT && (m_act_auto || cut)))) return false;
     fake_last_act = name;
     m_mode = M_ACT; m_act_auto = false;
     m_until = now() + scaled(1200 * (times ? times : 1), speed_pct);
     return true;
 }
+
+// The corner acts that fit a seat (mascot.cpp's CORNER_ANIMS without the
+// walk; the fake has room for all of them).
+static const char* const M_CYCLE[] = { "waving", "pointing", "dancing", "jumping happy", "trumpet",
+                                       "magnifier", "laptop", "idle hearts", "tank idle" };
+int mascot_cycle_count(void) { return (int)(sizeof(M_CYCLE) / sizeof(M_CYCLE[0])); }
+const char* mascot_cycle_name(int i) { return i >= 0 && i < mascot_cycle_count() ? M_CYCLE[i] : NULL; }
 
 void mascot_leave(uint16_t spd) {
     if (m_minimal || m_mode == M_AWAY) return;
@@ -201,7 +208,13 @@ void performer_walk_home(uint16_t spd) {
 }
 void performer_walk_off(int, uint16_t spd) { p_state = P_WALK_OUT; p_until = now() + scaled(2000, spd); }
 void performer_run_off(int side, uint16_t from, uint16_t, uint32_t) { performer_walk_off(side, from); }
-void performer_perform(int, uint32_t loop_ms) { p_state = P_SCENE; p_until = now() + loop_ms + 2000; }
+int fake_last_scene = -1;
+int fake_scenes = 0;
+void performer_perform(int idx, uint32_t loop_ms) {
+    p_state = P_SCENE; p_until = now() + loop_ms + 2000;
+    fake_last_scene = idx;
+    fake_scenes++;
+}
 void performer_perform_group(int, uint32_t loop_ms, bool) { performer_perform(0, loop_ms); }
 void performer_release(void) { if (p_state != P_OFF) p_state = P_STAND; }
 bool performer_busy(void) { return p_state == P_WALK_IN || p_state == P_WALK_OUT || p_state == P_SCENE; }
@@ -288,6 +301,8 @@ bool ui_meters_live(void) { return world.meters_live; }
 bool ui_header_hit(int, int y) { return y >= 0 && y < FAKE_HEADER_H; }
 int  ui_local_hour(void) { return -1; }
 void ui_set_alert_text(const char*) {}
+const char* fake_status_note = NULL;
+void ui_set_status_note(const char* text) { fake_status_note = text; }
 bool idle_is_asleep(void) { return world.asleep; }
 bool minimal_mode(void) { return false; }
 int  usage_rate_base_group(void) { return RATE_ACTIVE; }

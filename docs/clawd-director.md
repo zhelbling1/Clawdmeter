@@ -15,6 +15,7 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/clawd_director.{h,cpp}` | Owns the rooms and runs the beats. It is the only module that decides what Clawd does next. |
 | `firmware/src/clawd_policy.{h,cpp}` | Pure decision rules, unit-tested in `test/test_clawd_policy`: show gate and show group, screensaver gate, where attention returns to, how long a reaction waits for him, the corner seat's headroom, turn tracker, no-repeat picker, jitter, the resting face's rhythm, what a tap on the meters earns (the peek, how he sets off), where the face looks and how long it stays curious, and all tunables (`ClawdTuning`). |
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
+| `firmware/src/anim_sets.{h,cpp}` | The performer's scene lists (`GROUP_NAMES`, `CALM_NAMES`) and the cycle the next / previous animation buttons step through (`browse`, below). Pure, unit-tested in `test/test_anim_sets`. |
 | `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes (and the clawd-tank fan clips, below) at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM, or drawn straight to the panel on boards with `direct_performer`. |
 | `firmware/src/direct_sprite.{h,cpp}` | A full-size Clawd drawn straight to the panel without a screen-sized buffer, for `direct_performer` boards: the performer, the lurk trip and the attention walk-on use it there. Its diff and blit sizing are pure and unit-tested in `test/test_direct_sprite`. Ported from [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter). |
 | `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver, the held peek and pet mode's face (per-eye offsets, eye shape, a held squint: `face_look_each`, `face_set_eye_shape`, `face_set_squint`). |
@@ -113,6 +114,7 @@ passed. Beat changes always print; every step prints too after
 | `peek` | any tap on the meters (`home` or `corner`), live or stale (below) | Seated: a startled hop (`jumping` from its crouch, 2×), then he ducks out through the nearest edge at 4×; already moving or out: straight out at 4×. The face rises, eyes glance toward the tap's x and hold 1.6–2.4 s, a blink (30 % double), the look comes back to you, and the face stays up, curious, for 5 min: resting like the screensaver face (blinks every 2–6 s, some double), its glances going back toward the tap most of the time. Then it goes back on its own; a tap sends it back right away (with the acknowledging blink). Both go through `face-home`: the drop, and he walks back to his seat at 1.5×. (below: what else happens while it's up) |
 | `pet` | a tap on the header (the title, the battery, or Clawd in his seat: everything above the first card, `ui_header_hit`) from `home` or `corner`, meters live; `clawd pet` | He ducks out through the nearest edge at 4×, the face rises, and pet mode has it (below) until a tap on the header, a button press, 2 min without a touch or shake, the panel going to sleep, an alert or the link dropping. All of them go through `face-home`: the drop, and he walks back to his seat. On stale or pairing meters a header tap is a plain peek. |
 | `page` | the Clawd page opens (PWR, `page 1`; only from `home` or `corner`) | The corner Clawd is put away at once (the page covers the meters) and nothing on the meters moves: no show, screensaver, reaction or peek. An alert runs its clock and shows on the page; a tap dismisses it, the next tap (or PWR, or `clawd home`) closes the page and he walks back to his seat, or the attention beat takes over if the alert is still up. See "The Clawd page". |
+| `browse` | a button set to **Next animation** or **Previous animation** (`k1`–`k3` 7 / 8) pressed on the meters (`home`, `corner`, or during a show); `clawd next` / `clawd prev` | The cursor moves one step through the cycle (below) and he plays that scene: he steps out through the nearest edge at 2.5× (a lurk trip finishes its peek), walks on full size at 2.5×, plays the scene once (loop held 10 s, `browse_scene_ms`) with its name on the status line for 3 s (`browse_label_ms`, `ui_set_status_note`), walks off left at 1.5× and the corner Clawd walks back to his seat. A press while he's on stage (walking on, playing, walking off, or in a show) skips straight to the next scene: the scene stops on the idle pose where it is (a walker walks back home first, at 2.5×) and the new one starts, with no walk-off and walk-on between. Without the performer the cycle is the corner acts (below), played in his seat (he hurries back to it first if he's out), and a press while one plays cuts to the next. |
 | `attention` | `m` (alert) in a payload | The corner walks off at 2×, the big Clawd (12 px cells) walks on at 2×, then waves and points alternately (no full-size sprite: he waves and points in his seat). The alert lasts until a tap, `x` (clear) or 2 min; his animation lasts the **attention animation** time (below), 2 min by default, after which the big one walks off left and the corner Clawd sits in his seat while the alert stays up. Off: no animation, he sits in his seat. A new alert animates again. Interrupts a show or the screensaver through `face-home` / `run-home`, and then returns to where it left off (below). |
 
 **Which scene a show plays.** The trigger (activity 3) lifts the live mood
@@ -127,7 +129,7 @@ carrying, builder, building). Shows never repeat the previous show's
 scene, and calm dips never repeat the previous calm scene (tracked separately,
 so a calm dip doesn't reset the show's no-repeat memory).
 
-**The animation sets** (`GROUP_NAMES` / `CALM_NAMES` in `performer.cpp`, the
+**The animation sets** (`GROUP_NAMES` / `CALM_NAMES` in `anim_sets.cpp`, the
 corner acts in `ACTS_BY_RATE` in `mascot.cpp`). Entries marked fan are
 fan-made (research/clawd-fan/, category `fan` in the generated header); book is
 an official but unlisted persona GIF.
@@ -526,7 +528,7 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
     `chime: largest internal block … room for N of 18411 frames` is the
     check.
   - New full-size work needs nothing special: performer scenes (any name in
-    `GROUP_NAMES` / `CALM_NAMES`, `performer_perform`,
+    `GROUP_NAMES` / `CALM_NAMES` in `anim_sets.cpp`, `performer_perform`,
     `performer_perform_group`) and the mascot's full-size modes go through
     `render_cells` / `draw_big` / `draw_lurk`, which pick the image or the
     direct sprite. Gate full-size beats on `performer_available()` (or the
@@ -556,7 +558,58 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
   a single press flips between the meters and the page and two presses
   within 400 ms cycle brightness (the single press waits that long for a
   second one).
-- Shows are earned rather than opened by a button or a tap.
+- Shows are earned rather than opened by a button or a tap. A button set
+  to **Next animation** / **Previous animation** asks for one scene instead
+  (below).
+
+### Next / previous animation
+
+Any button (`k1`–`k3`, the app's Device page, Controls → Other) can be set
+to **Next animation** (7) or **Previous animation** (8). It's an on-device
+action like brightness: no key press goes to the computer. A press goes
+through `director_button(main_button, button_action_anim_step(action))`, so
+it does what any button does first (counts as you being here, wakes the
+screensaver, ends pet mode, dismisses an alert on a touchless board), and
+then the `browse` beat (above) takes it if he's on the meters:
+
+- **The cycle** (`anim_cycle_*`, `anim_sets.cpp`): every scene in
+  `GROUP_NAMES` and `CALM_NAMES` once, official first, then the fan-made
+  ones, then the clawd-tank clips, each in table order (idle, normal,
+  active, heavy, calm): magnifier, walking, pointing, lurking, book, crab
+  walking, waving, trumpet, basketball, laptop, dancing, skateboard, soccer,
+  racing car, cloud, sailing scene, jumping happy; eating, idle blossom,
+  idle hearts, fm listening, space, work out, surfing, hanabi, jumping
+  blossom, swim summer, baking, this is fine; tank idle, tank sleeping, tank
+  typing, tank thinking, tank debugger, tank grooving, tank conducting, tank
+  juggling, tank wizard, tank carrying, tank builder, tank building (41).
+  Tank low battery isn't listed (it's the low-battery calm dip). Without the
+  performer it's the corner acts that play as themselves in his seat
+  (`mascot_cycle_name`: `CORNER_ANIMS` without the walk and without any act
+  too tall for the seat's headroom): waving, pointing, dancing, jumping
+  happy, trumpet, magnifier, laptop, idle hearts, tank idle.
+- **The cursor** is in RAM only and starts before the first: the first Next
+  plays the first scene, the first Previous the last; it wraps both ways
+  and survives the beat (the next press carries on from it).
+- **From the meters** (`home`, a corner act, a walk home, a show): the beat
+  starts. During a show the show gives way at once (it has already counted
+  for the show gate).
+- **Anywhere else the press does only what any button does.** The screensaver
+  (face or effect) and pet mode go home: press again once he's back. The
+  tap-peek's face, the Clawd page, `face-home` and `run-home` ignore it.
+  During an alert (attention) it is just you being here: the alert stays up
+  (on a touchless board the main button dismisses it, as before).
+- **Liveliness**: no level gates it. No-nonsense has no earned shows, but this
+  one is asked for, like the peek a tap still gets.
+- **The first press on a dark panel** only wakes it (`idle_consume_wake_press`),
+  as for every button. Minimal mode ignores it.
+- **PWR** set to it: the scene page's single / double press split applies
+  only when PWR's action is brightness, so every PWR press is a step and PWR
+  doesn't open the Clawd page then.
+- **One Clawd**: the corner Clawd is off screen before the performer walks
+  on, and the performer is off before the corner walks back; a skip changes
+  the performer's scene in place. A tap, an alert or the page end it the
+  usual ways (`run-home`, or a turn-around if he hasn't walked on yet).
+  `test_director` fuzzes these presses with everything else.
 
 ## The Clawd page
 
@@ -717,7 +770,10 @@ at Off / 10 s / 30 s (`test_director`). In the sim:
   nothing left hanging once the input stops; also with only one of the
   performer and the full-size sprite, as a `direct_performer` board has
   when only one of their grids could be allocated; plus pet mode's ways
-  out, the test-run party, the screensaver's turns and the page).
+  out, the test-run party, the screensaver's turns, the page, and the next /
+  previous animation buttons: the cycle's order, the skip-ahead with the
+  performer on stage throughout, a show giving way, the press elsewhere,
+  No-nonsense and the corner-act cycle), `-f test_anim_sets` (the cycle).
 - Sim: `SIM_FAST=1 SIM_SCENARIO=sim/director.jsonl`, plus `SIM_SHOTS` /
   `SIM_TAPS` for headless capture (see `docs/simulator.md`) and `SIM_TRACE=1` for
   the per-step trace. The interruptions (lurk cut short, attention resuming
@@ -766,6 +822,7 @@ and Off, 35-peek-* a tap on the meters: crouch, hop, ducks
 - Hardware: send `clawd show`, `clawd screensaver [n]` (n: 0 the face, 1
   starfield, 2 code rain, 3 constellation), `clawd attention`, `clawd joy`,
   `clawd lurk`, `clawd peek [x]` (the peek now, as a tap at x), `clawd pet`,
+  `clawd next` / `clawd prev` (a next / previous animation button),
   `clawd pass` / `clawd fail` (a test verdict, as `e` t / f), `clawd
   confetti` or `clawd home` on the serial console, then `screenshot`
   (`.claude/skills/capturing-device-screenshots/scripts/screenshot.py`). This replaces swapping the boot screen in `main.cpp`.

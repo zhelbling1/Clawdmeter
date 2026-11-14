@@ -493,6 +493,9 @@ static void button_run_press(ButtonSlot slot, ButtonRun* r, int32_t action, bool
     case BTN_KIND_BRIGHTNESS:
         brightness_cycle();
         break;
+    case BTN_KIND_NEXT_ANIM:
+    case BTN_KIND_PREV_ANIM:
+        break;   // on the device: director_button(…, button_action_anim_step) plays it
     default:
         break;
     }
@@ -560,11 +563,13 @@ void loop() {
         bool primary_now = input_hal_is_held(INPUT_BTN_PRIMARY);
         if (primary_now != primary_was) {
             if (primary_now) {
+                const int32_t action = button_action_get(BTN_SLOT_PRIMARY);
                 if (idle_consume_wake_press()) primary_wake_swallowed = true;
                 // No touchscreen: BOOT dismisses an active alert first and is
-                // not a push-to-talk press then.
-                else if (director_button(true)) primary_wake_swallowed = true;
-                else button_run_press(BTN_SLOT_PRIMARY, &primary_run, button_action_get(BTN_SLOT_PRIMARY), true);
+                // not a push-to-talk press then. Next / previous animation is
+                // the director's (button_action_anim_step).
+                else if (director_button(true, button_action_anim_step(action))) primary_wake_swallowed = true;
+                else button_run_press(BTN_SLOT_PRIMARY, &primary_run, action, true);
             } else {
                 if (primary_wake_swallowed) primary_wake_swallowed = false;
                 else                        button_run_release(BTN_SLOT_PRIMARY, &primary_run);
@@ -583,8 +588,9 @@ void loop() {
                 if (secondary_now) {
                     if (idle_consume_wake_press()) secondary_wake_swallowed = true;
                     else {
-                        button_run_press(BTN_SLOT_SECONDARY, &secondary_run, button_action_get(BTN_SLOT_SECONDARY), true);
-                        director_button(false);
+                        const int32_t action = button_action_get(BTN_SLOT_SECONDARY);
+                        button_run_press(BTN_SLOT_SECONDARY, &secondary_run, action, true);
+                        director_button(false, button_action_anim_step(action));
                     }
                 } else {
                     if (secondary_wake_swallowed) secondary_wake_swallowed = false;
@@ -610,12 +616,14 @@ void loop() {
                 // A board without a PWR button may still report a press (the
                 // T4-S3 makes one from a long BOOT hold): that stays brightness,
                 // as the app offers no PWR field there.
-                if (director_button(board_caps().button_count == 0)) {
+                // Next / previous animation is the director's; the page split
+                // below is only for brightness, so it doesn't apply then.
+                const int32_t action = board_caps().has_pwr_button ? button_action_get(BTN_SLOT_PWR)
+                                                                   : (int32_t)BTN_ACT_BRIGHTNESS;
+                if (director_button(board_caps().button_count == 0, button_action_anim_step(action))) {
                     pwr_tap_pending = false;
                 } else {
                     ButtonRun pwr_run = {};
-                    const int32_t action = board_caps().has_pwr_button ? button_action_get(BTN_SLOT_PWR)
-                                                                       : (int32_t)BTN_ACT_BRIGHTNESS;
                     const bool brightness = button_action_decode(action).kind == BTN_KIND_BRIGHTNESS;
                     // The page / double-press split is for a real PWR key only:
                     // a faked press (a long BOOT hold) can't be doubled in time,
