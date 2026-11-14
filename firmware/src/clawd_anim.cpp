@@ -62,6 +62,12 @@ bool clawd_anim_fan(int index) {
     return strcmp(splash_anims[index].category, "fan") == 0;
 }
 
+const char* clawd_anim_original_mood(int index) {
+    if (index < 0 || index >= SPLASH_ANIM_COUNT) return NULL;
+    const char* c = splash_anims[index].category;
+    return strncmp(c, "original ", 9) == 0 ? c + 9 : NULL;
+}
+
 const ClawdAnim* clawd_anim(const char* name) {
     return clawd_anim_at(clawd_anim_index(name));
 }

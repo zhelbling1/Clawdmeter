@@ -347,7 +347,8 @@ A press on the meters sends Clawd out of his seat; he walks back on full
 size and plays the next animation, with its name on the status line for a
 few seconds, then walks off and sits back down. Press again while he's
 playing to go straight to the next (or previous) one. The order is the
-official animations first, then the fan-made ones, then the clawd-tank set;
+official animations first, then this fork's pop-culture gag scenes (boards
+with 16 MB of flash), then the fan-made ones, then the clawd-tank set;
 it wraps around, and the board remembers where you were until it restarts.
 The first Next plays the first one, the first Previous the last.
 

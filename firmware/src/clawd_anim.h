@@ -35,6 +35,10 @@ int              clawd_anim_index(const char* name); // -1 when not found
 // Fan-made (category `fan`: research/clawd-fan/, the clawd-tank clips among
 // them) rather than official. False out of range.
 bool             clawd_anim_fan(int index);
+// This fork's pop-culture originals (category "original <mood>", only in
+// builds with CLAWD_ORIGINALS): their mood, "active", "heavy" or "calm";
+// NULL for every other animation and out of range.
+const char*      clawd_anim_original_mood(int index);
 // Repaint the palettes in the live TH_CLAWD (theme_palette.h) after a new
 // palette; whoever has a frame on screen redraws it (mascot_repaint,
 // performer_repaint).

@@ -24,10 +24,50 @@ const char* const CALM_NAMES[CALM_COUNT] = {
     "fm listening", "space", "tank idle", "tank sleeping",
 };
 
+// ─── The pools ───────────────────────────────────────────────────────────────
+// Built once, on first use. Slot GROUP_COUNT is the calm dips.
+#define ORIG_MAX 32
+#define POOL_MAX (GROUP_MAX + ORIG_MAX)
+static const char* pools[GROUP_COUNT + 1][POOL_MAX];
+static int         pool_n[GROUP_COUNT + 1];
+static bool        pools_built = false;
+
+// Which pool an original of this mood joins; -1 for none.
+static int mood_slot(const char* mood) {
+    if (!mood) return -1;
+    if (strcmp(mood, "active") == 0) return 2;
+    if (strcmp(mood, "heavy") == 0) return 3;
+    if (strcmp(mood, "calm") == 0) return GROUP_COUNT;
+    return -1;
+}
+
+static void build_pools(void) {
+    if (pools_built) return;
+    pools_built = true;
+    for (int s = 0; s <= GROUP_COUNT; s++) {
+        const char* const* names = s < GROUP_COUNT ? GROUP_NAMES[s] : CALM_NAMES;
+        const int count = s < GROUP_COUNT ? GROUP_MAX : CALM_COUNT;
+        pool_n[s] = 0;
+        for (int i = 0; i < count; i++)
+            if (names[i]) pools[s][pool_n[s]++] = names[i];
+    }
+    for (int a = 0; a < clawd_anim_count(); a++) {
+        const int s = mood_slot(clawd_anim_original_mood(a));
+        if (s >= 0 && pool_n[s] < POOL_MAX) pools[s][pool_n[s]++] = clawd_anim_at(a)->name;
+    }
+}
+
+const char* const* anim_pool(int group, bool calm, int* n) {
+    build_pools();
+    const int s = calm ? GROUP_COUNT : (group >= 0 && group < GROUP_COUNT ? group : 0);
+    if (n) *n = pool_n[s];
+    return pools[s];
+}
+
 // ─── The cycle ───────────────────────────────────────────────────────────────
 // Built once, on first use: indices into the animation table (under 256).
 #define FLAT_COUNT (GROUP_COUNT * GROUP_MAX + CALM_COUNT)
-#define CYCLE_MAX  64
+#define CYCLE_MAX  96
 static uint8_t cycle[CYCLE_MAX];
 static int     cycle_n = -1;
 
@@ -36,23 +76,33 @@ static const char* flat(int i) {
                                        : CALM_NAMES[i - GROUP_COUNT * GROUP_MAX];
 }
 
-// 0 official, 1 fan-made, 2 a clawd-tank clip.
+// 0 official, 1 an original, 2 fan-made, 3 a clawd-tank clip.
 static int tier(int anim, const char* name) {
+    if (clawd_anim_original_mood(anim)) return 1;
     if (!clawd_anim_fan(anim)) return 0;
-    return strncmp(name, "tank ", 5) == 0 ? 2 : 1;
+    return strncmp(name, "tank ", 5) == 0 ? 3 : 2;
+}
+
+static void add(int a) {
+    if (a < 0 || a > 255) return;
+    for (int j = 0; j < cycle_n; j++)
+        if (cycle[j] == a) return;
+    if (cycle_n < CYCLE_MAX) cycle[cycle_n++] = (uint8_t)a;
 }
 
 static void build(void) {
     if (cycle_n >= 0) return;
     cycle_n = 0;
-    for (int t = 0; t < 3; t++) {
+    for (int t = 0; t < 4; t++) {
+        if (t == 1) {   // the originals aren't in the tables: header order
+            for (int a = 0; a < clawd_anim_count(); a++)
+                if (mood_slot(clawd_anim_original_mood(a)) >= 0) add(a);
+            continue;
+        }
         for (int i = 0; i < FLAT_COUNT; i++) {
             const char* name = flat(i);
             const int a = clawd_anim_index(name);
-            if (a < 0 || a > 255 || tier(a, name) != t) continue;
-            bool seen = false;
-            for (int j = 0; j < cycle_n && !seen; j++) seen = cycle[j] == a;
-            if (!seen && cycle_n < CYCLE_MAX) cycle[cycle_n++] = (uint8_t)a;
+            if (a >= 0 && tier(a, name) == t) add(a);
         }
     }
 }

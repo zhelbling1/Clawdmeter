@@ -15,7 +15,7 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/clawd_director.{h,cpp}` | Owns the rooms and runs the beats. It is the only module that decides what Clawd does next. |
 | `firmware/src/clawd_policy.{h,cpp}` | Pure decision rules, unit-tested in `test/test_clawd_policy`: show gate and show group, screensaver gate, where attention returns to, how long a reaction waits for him, the corner seat's headroom, turn tracker, no-repeat picker, jitter, the resting face's rhythm, what a tap on the meters earns (the peek, how he sets off), where the face looks and how long it stays curious, and all tunables (`ClawdTuning`). |
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
-| `firmware/src/anim_sets.{h,cpp}` | The performer's scene lists (`GROUP_NAMES`, `CALM_NAMES`) and the cycle the next / previous animation buttons step through (`browse`, below). Pure, unit-tested in `test/test_anim_sets`. |
+| `firmware/src/anim_sets.{h,cpp}` | The performer's scene lists (`GROUP_NAMES`, `CALM_NAMES`, and `anim_pool`, which adds the originals by mood) and the cycle the next / previous animation buttons step through (`browse`, below). Pure, unit-tested in `test/test_anim_sets`. |
 | `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes (and the clawd-tank fan clips, below) at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM, or drawn straight to the panel on boards with `direct_performer`. |
 | `firmware/src/direct_sprite.{h,cpp}` | A full-size Clawd drawn straight to the panel without a screen-sized buffer, for `direct_performer` boards: the performer, the lurk trip and the attention walk-on use it there. Its diff and blit sizing are pure and unit-tested in `test/test_direct_sprite`. Ported from [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter). |
 | `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver, the held peek and pet mode's face (per-eye offsets, eye shape, a held squint: `face_look_each`, `face_set_eye_shape`, `face_set_squint`). |
@@ -142,8 +142,17 @@ an official but unlisted persona GIF.
 | Heavy burn | racing car, cloud, sailing scene, jumping happy, baking (fan), this is fine (fan), tank carrying, builder, building |
 | Calm dip | magnifier, walking, book, eating (fan), idle blossom (fan), idle hearts (fan), fm listening (fan), space (fan), tank idle, tank sleeping; tank low battery instead on a board running low on its own battery |
 
+**The originals** (this fork's pop-culture gag scenes,
+`research/clawd-fan/originals/`, category `original <mood>` in the header)
+are built only where `CLAWD_ORIGINALS` is set: the envs with a 16 MB or larger
+flash (6.25 MB app slots), plus `sim` and `native`; the 8 MB and 4 MB boards
+leave them out. They aren't in the tables: `anim_pool` appends each one to
+the pool of its catalog mood (active to Active, heavy to Heavy, calm to the
+calm dips), and the performer picks from those pools. In the button cycle
+they come right after the official scenes.
+
 Shows only ever draw from Active and Heavy (`clawd_show_group` floors at
-Active); calm dips draw from `CALM_NAMES`. The corner acts draw from
+Active); calm dips draw from `CALM_NAMES` (plus the calm originals). The corner acts draw from
 `ACTS_BY_RATE`: the idle group also draws idle hearts and tank idle, the
 normal group tank idle too (fan; idle hearts is 24×28 cells, on the seated
 Clawd's own left edge, inside the corner buffer the other acts already size),

@@ -38,8 +38,9 @@ static DirectSprite ds;
 static bool ready(void) { return img || direct; }
 
 // ─── Mood groups ─────────────────────────────────────────────────────────────
-// GROUP_NAMES and CALM_NAMES are in anim_sets.cpp (pure, so the native tests
-// and the button cycle see the same lists).
+// GROUP_NAMES, CALM_NAMES and the pools with the originals (anim_pool) are in
+// anim_sets.cpp (pure, so the native tests and the button cycle see the same
+// lists).
 // On a board running low on its own battery, the calm dip is this one.
 static const char* const CALM_LOW_BATTERY = "tank low battery";
 #define LOW_BATTERY_PCT 20
@@ -404,8 +405,8 @@ void performer_perform_group(int group, uint32_t loop_ms, bool calm) {
         const ClawdAnim* lb = clawd_anim(CALM_LOW_BATTERY);
         if (lb) { last_calm = lb->name; scene_start(lb, loop_ms); return; }
     }
-    const char* const* names = calm ? CALM_NAMES : GROUP_NAMES[group];
-    const int n = calm ? CALM_COUNT : GROUP_MAX;
+    int n = 0;
+    const char* const* names = anim_pool(group, calm, &n);
     const char*& last = calm ? last_calm : last_show;
     const int pick = clawd_pick_no_repeat(names, n, last, &rng);
     const ClawdAnim* a = pick >= 0 ? clawd_anim(names[pick]) : NULL;

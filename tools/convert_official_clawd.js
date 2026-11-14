@@ -142,7 +142,9 @@ function originalAnims() {
     if (!fs.existsSync(cat)) continue;
     for (const e of JSON.parse(fs.readFileSync(cat, 'utf8'))) {
       if (!e.file || !e.name || !e.mood) throw new Error(`${cat}: entries need file, name and mood`);
-      out.push({ file: e.file, name: e.name, category: 'original', dir: path.join(ORIG_DIR, sub),
+      if (!['active', 'heavy', 'calm'].includes(e.mood)) throw new Error(`${cat}: ${e.name}: mood is active, heavy or calm`);
+      // The firmware reads the mood back from the category (clawd_anim_mood).
+      out.push({ file: e.file, name: e.name, category: `original ${e.mood}`, dir: path.join(ORIG_DIR, sub),
         rows: e.rows && e.rows !== STAGE_H ? e.rows : undefined, loop: e.loop, mood: e.mood,
         original: true, credit: e.credit });
     }
@@ -614,7 +616,7 @@ function main() {
   out += 'typedef struct {\n';
   out += '    const char *name;\n';
   out += '    const char *category;      // "core" | "persona" | "fan" (fan-made)' +
-    (originals.length ? ' | "original"\n' : '\n');
+    (originals.length ? ' | "original <mood>"\n' : '\n');
   out += '    uint8_t  w, h;             // frame size, cells\n';
   out += '    uint8_t  ox;               // crop origin on the 55x37 stage\n';
   out += '    int8_t   oy;               //   (negative: art above the stage)\n';

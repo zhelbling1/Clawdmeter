@@ -23,10 +23,18 @@ extern const char* const GROUP_NAMES[GROUP_COUNT][GROUP_MAX];
 #define CALM_COUNT 10
 extern const char* const CALM_NAMES[CALM_COUNT];
 
+// What the performer draws from: a group's names (or CALM_NAMES when `calm`)
+// followed by the originals of that mood (builds with CLAWD_ORIGINALS: this
+// fork's pop-culture scenes, research/clawd-fan/originals/), "active" ones in
+// group 2, "heavy" ones in group 3 and "calm" ones in the calm dips. No NULL
+// entries; *n is the count. Out-of-range groups give group 0.
+const char* const* anim_pool(int group, bool calm, int* n);
+
 // The cycle: every scene in GROUP_NAMES and CALM_NAMES that the animation
-// header has, once each, official first, then the fan-made ones, then the
-// clawd-tank clips (fan-made, "tank ..."), each part in the order the tables
-// list them (idle, normal, active, heavy, calm).
+// header has, plus every original, once each: official first, then the
+// originals, then the fan-made ones, then the clawd-tank clips (fan-made,
+// "tank ..."), each part in the order the tables list them (idle, normal,
+// active, heavy, calm; originals in header order).
 int         anim_cycle_count(void);
 int         anim_cycle_anim(int i);      // clawd_anim index, -1 out of range
 const char* anim_cycle_name(int i);      // NULL out of range

@@ -105,7 +105,9 @@ bool     clawd_rng_chance(ClawdRng* r, uint8_t pct);               // 0..100
 // Secondary action: never the same thing twice in a row. Picks an index in
 // [0, count) whose `names[i]` differs from `last` (string compare; NULL
 // entries are skipped). Returns -1 if nothing is pickable. With one distinct
-// candidate it is returned even if it equals `last`.
+// candidate it is returned even if it equals `last`. Only the first
+// CLAWD_PICK_MAX non-NULL names are candidates.
+#define CLAWD_PICK_MAX 64
 int clawd_pick_no_repeat(const char* const* names, int count, const char* last, ClawdRng* r);
 
 // Jittered gap: base ± 40 %.

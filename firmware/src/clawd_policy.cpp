@@ -161,9 +161,9 @@ bool clawd_rng_chance(ClawdRng* r, uint8_t pct) {
 }
 
 int clawd_pick_no_repeat(const char* const* names, int count, const char* last, ClawdRng* r) {
-    int cand[16];
+    int cand[CLAWD_PICK_MAX];
     int n = 0, any = -1;
-    for (int i = 0; i < count && n < 16; i++) {
+    for (int i = 0; i < count && n < CLAWD_PICK_MAX; i++) {
         if (!names[i]) continue;
         any = i;
         if (last && strcmp(names[i], last) == 0) continue;
