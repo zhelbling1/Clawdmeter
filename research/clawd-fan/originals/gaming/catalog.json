@@ -1,0 +1,130 @@
+[
+  {
+    "file": "Clawd-CakeIsALie.gif",
+    "name": "the cake is a lie",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      21,
+      23
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Portal (2007): orange jumpsuit tied at the waist, white tank top, long-fall boots, a ceiling portal and the cake that was a lie.",
+    "frames": 31,
+    "ms": 6880,
+    "colours": 15,
+    "kb": 39.8
+  },
+  {
+    "file": "Clawd-YouDied.gif",
+    "name": "you died",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      20,
+      23
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Dark Souls (2011): the red \"YOU DIED\" caption, bonfire checkpoints, a sun-emblem knight and the \"Praise the Sun\" salute.",
+    "frames": 30,
+    "ms": 7400,
+    "colours": 15,
+    "kb": 40.3
+  },
+  {
+    "file": "Clawd-LevelUp.gif",
+    "name": "level up",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      15,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Old School RuneScape woodcutting: chopping a yew, the level-up fireworks. Generic lumberjack costume, no game sprites.",
+    "frames": 24,
+    "ms": 4750,
+    "colours": 16,
+    "kb": 38.6
+  },
+  {
+    "file": "Clawd-SellingLobbies.gif",
+    "name": "selling lobbies",
+    "mood": "calm",
+    "rows": 37,
+    "loop": [
+      14,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Old School RuneScape: cage-fishing lobsters and the \"selling lobbies\" trade-chat cry. Generic fisherman costume, no game sprites.",
+    "frames": 24,
+    "ms": 6020,
+    "colours": 15,
+    "kb": 34
+  },
+  {
+    "file": "Clawd-PartyHat.gif",
+    "name": "party hat drop",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      14,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Old School RuneScape: the rare blue party hat, the holiday item drop and the scramble for it. Generic paper crown, no game sprites.",
+    "frames": 25,
+    "ms": 4870,
+    "colours": 13,
+    "kb": 38.8
+  },
+  {
+    "file": "Clawd-CardboardBox.gif",
+    "name": "cardboard box",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      18,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Metal Gear Solid (1998): hiding under a cardboard box, the bandana and sneaking suit, the red \"!\" alert. No game sprites.",
+    "frames": 29,
+    "ms": 5820,
+    "colours": 14,
+    "kb": 38.8
+  },
+  {
+    "file": "Clawd-BarrelRoll.gif",
+    "name": "barrel roll",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      11,
+      20
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Star Fox 64 (1997): the \"Do a barrel roll!\" catchphrase. Generic aviator costume (flying cap, goggles, scarf, bomber jacket); no ships or characters.",
+    "frames": 30,
+    "ms": 5130,
+    "colours": 14,
+    "kb": 38.7
+  },
+  {
+    "file": "Clawd-ArrowKnee.gif",
+    "name": "arrow to the knee",
+    "mood": "heavy",
+    "rows": 37,
+    "loop": [
+      15,
+      18
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The Elder Scrolls V: Skyrim (2011): the town guard who \"took an arrow in the knee\". Generic guard costume, no game sprites.",
+    "frames": 27,
+    "ms": 5660,
+    "colours": 13,
+    "kb": 36.8
+  }
+]
