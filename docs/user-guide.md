@@ -97,9 +97,11 @@ The board can get its data over the USB cable instead of Bluetooth.
 
 Pairing is optional. The meters, Clawd, alerts and chimes work over USB
 alone. The app tries USB first:
-at start-up it looks for a board on USB before it tries Bluetooth, and while
-a USB link is up it keeps its own Bluetooth link closed. If the cable is
-pulled, or no board is on USB, data goes over Bluetooth.
+at start-up it looks for a board on USB before it tries Bluetooth. While a
+USB link is up, data goes over USB; on Windows the app also closes its own
+Bluetooth link (it types the buttons' key presses itself), and on macOS and
+Linux it keeps a paired board's Bluetooth connection for the buttons. If the
+cable is pulled, or no board is on USB, data goes over Bluetooth.
 
 To never use Bluetooth, turn off **Use Bluetooth** in **Settings** (`bluetooth
 = off` in the config). The app then looks for the board on USB only, shows

@@ -207,14 +207,18 @@ impl SerialLink {
         let thread = std::thread::Builder::new()
             .name("clawdmeter-usb".into())
             .spawn(move || {
+                let queue = etx.clone();
                 let forwarded = run(sp, &name, wrx, etx, &k, &s);
                 // Whatever the board held is up now: the sink never waits
-                // for a release that can't come.
+                // for a release that can't come. With no sink yet, the
+                // releases join the queue behind the presses, so a later
+                // forward_keys hands over both in order (never a lone
+                // key-down that repeats until the stuck-key guard).
                 if forwarded {
-                    if let Some(tx) = k.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
-                        let _ = tx.send(LinkEvent::Keyboard(KeyboardReport::default()));
-                        let _ = tx.send(LinkEvent::Consumer(0));
-                    }
+                    let sink = k.lock().unwrap_or_else(|e| e.into_inner());
+                    let tx = sink.as_ref().unwrap_or(&queue);
+                    let _ = tx.send(LinkEvent::Keyboard(KeyboardReport::default()));
+                    let _ = tx.send(LinkEvent::Consumer(0));
                 }
                 a.store(false, Ordering::SeqCst);
                 if let Some(h) = held {

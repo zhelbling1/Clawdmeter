@@ -250,11 +250,14 @@ Per account (`probe.rs`, `oauth.rs`):
   asked again after 5 min; a port that didn't answer or couldn't be opened,
   after 20 s. The backoff is forgotten when the window claims the port. Scans
   skip ports waiting out a retry. While a link is
-  open every write goes over USB instead of BLE, and the daemon keeps BLE
-  closed (USB first: `daemon::ble_allowed(setting, usb_open,
-  first_scan_done)`; at start-up the first scan runs before any BLE connect,
-  unless USB is off or the window holds the port; the buttons use Windows' own
-  HID pairing, not the app's link). If the link drops, BLE connects again and
+  open every write goes over USB instead of BLE (USB first:
+  `daemon::ble_allowed(setting, usb_open, first_scan_done, usb_keys_typed)`;
+  at start-up the first scan runs before any BLE connect, unless USB is off
+  or the window holds the port). On Windows, which types the board's key
+  presses from USB (`crate::keys`), the daemon keeps BLE closed while USB is
+  up. Elsewhere it keeps the BLE link up beside USB but writes nothing to it:
+  closing it would, on BlueZ, also drop the board's HID keyboard connection
+  and with it the buttons. If the link drops, BLE connects again and
   writes go back to it. The engine resends with
   `Engine::resend_all(lost)` (all settings and the numbers, alert state kept;
   `lost = true` also re-sends an alert that is up, silently: no `b`, via

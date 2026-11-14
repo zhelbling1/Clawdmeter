@@ -128,13 +128,21 @@ fn close_usb(l: SerialLink) {
     tokio::task::spawn_blocking(move || l.close());
 }
 
-/// Whether the Bluetooth data link may run: the setting is on, no USB link is
-/// open (USB carries the data; the buttons use Windows' own pairing), and the
-/// first USB scan is over (USB first). `first_usb_scan_done` also covers USB
-/// being off or the window holding the port.
-pub fn ble_allowed(setting_on: bool, usb_link_open: bool, first_usb_scan_done: bool) -> bool {
-    setting_on && !usb_link_open && first_usb_scan_done
+/// Whether the Bluetooth data link may run: the setting is on and the first
+/// USB scan is over (USB first; `first_usb_scan_done` also covers USB being
+/// off or the window holding the port), and either no USB link is open or
+/// this computer can't type the board's key presses from USB
+/// (`usb_keys_typed`, Windows only so far). Closing the link while USB is up
+/// would, on BlueZ, also drop the board's HID keyboard connection: where the
+/// app can't type USB keys, the link stays up for the buttons (nothing is
+/// written to it while USB carries the data).
+pub fn ble_allowed(setting_on: bool, usb_link_open: bool, first_usb_scan_done: bool, usb_keys_typed: bool) -> bool {
+    setting_on && first_usb_scan_done && (!usb_link_open || !usb_keys_typed)
 }
+
+/// This computer types the board's key presses when they come over USB
+/// (crate::keys: SendInput on Windows; a stub elsewhere).
+const USB_KEYS_TYPED: bool = cfg!(windows);
 
 /// Requests from the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -529,7 +537,8 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
         // USB first: the first scan has run (or USB is off, or the window
         // holds the port), and no USB link is open.
         let bluetooth_on = engine.settings().bluetooth;
-        let ble_ok = ble_allowed(bluetooth_on, usb.is_some(), !usb_on || first_usb_scan_done || claimed);
+        let ble_ok =
+            ble_allowed(bluetooth_on, usb.is_some(), !usb_on || first_usb_scan_done || claimed, USB_KEYS_TYPED);
         if !ble_ok {
             if let Some(l) = link.take() {
                 if bluetooth_on {
@@ -575,8 +584,9 @@ pub async fn run(paths: Paths, mut commands: mpsc::UnboundedReceiver<Command>, s
                     link = Some(l);
                     device_events = Some(rx);
                     reconnect.connected();
-                    // While USB carries the data, BLE is only the buttons:
-                    // the device's state (alert included) is unchanged, so
+                    // Where the app can't type USB keys (not Windows), BLE
+                    // stays up beside a USB link for the buttons only: the
+                    // device's state (alert included) is unchanged, so
                     // there is nothing to start over or resend.
                     if usb.is_none() {
                         inbox.reset();
@@ -764,15 +774,25 @@ mod tests {
 
     #[test]
     fn bluetooth_waits_for_usb() {
-        // (setting, usb open, first scan done) -> allowed
-        assert!(!ble_allowed(true, false, false), "USB first: wait for the first scan");
-        assert!(ble_allowed(true, false, true), "no board on USB: Bluetooth may connect");
-        assert!(!ble_allowed(true, true, true), "a USB link carries the data");
-        assert!(!ble_allowed(true, true, false));
+        // (setting, usb open, first scan done, usb keys typed) -> allowed
+        assert!(!ble_allowed(true, false, false, true), "USB first: wait for the first scan");
+        assert!(ble_allowed(true, false, true, true), "no board on USB: Bluetooth may connect");
+        assert!(!ble_allowed(true, true, true, true), "a USB link carries the data and the keys");
+        assert!(!ble_allowed(true, true, false, true));
         for usb in [false, true] {
             for scanned in [false, true] {
-                assert!(!ble_allowed(false, usb, scanned), "off means off");
+                for typed in [false, true] {
+                    assert!(!ble_allowed(false, usb, scanned, typed), "off means off");
+                }
             }
         }
+    }
+
+    #[test]
+    fn bluetooth_stays_for_the_buttons_where_usb_keys_cant_be_typed() {
+        // Not Windows: closing the link would drop the board's HID keyboard
+        // on BlueZ, so it stays up beside a USB link.
+        assert!(ble_allowed(true, true, true, false));
+        assert!(!ble_allowed(true, true, false, false), "still USB first at start-up");
     }
 }
