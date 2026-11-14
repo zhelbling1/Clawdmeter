@@ -62,5 +62,21 @@
     "ms": 5010,
     "colours": 11,
     "kb": 35.8
+  },
+  {
+    "file": "Clawd-HalfLife.gif",
+    "name": "rise and shine",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      16
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "Half-Life 2 (2004): the silent scientist in an orange-and-grey hazard suit (glasses, goatee, red crowbar) smashing supply crates, watched by a mysterious man in a blue-grey suit with a briefcase. Costumes only: no lambda or other logos, no game UI or sprites.",
+    "frames": 28,
+    "ms": 6600,
+    "colours": 15,
+    "kb": 37.7
   }
 ]

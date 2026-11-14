@@ -66,3 +66,5 @@ moon) and the poof-on / poof-off bookends.
 | Moonwalk | `music/moonwalk.js` | The moonwalk and its 1980s stagecraft: white fedora, one sparkly glove, toe stand, hat tip. |
 | Wrecking ball | `music/wreckingball.js` | The 2013 power-ballad music video: riding a giant wrecking ball while hugging its chain, short platinum hair, one tear. The chain runs up through the headroom rows. Mood: heavy. |
 | Zombie dance | `music/zombie.js` | The famous early-80s horror music video's dance: full moon, zombie shuffle with an arm out, sideways claw dance, shoulder shrugs, a bow; red jacket with black V stripes and shoulder pads. |
+
+| Rise and shine | `gaming/hl2.js` | active | Half-Life 2 (2004): a Clawd in an orange-and-grey hazard suit (little glasses, goatee, red crowbar) smashes crates while a Clawd in a blue-grey suit with a briefcase flickers in, watches, straightens his tie ("WAKE UP") and glitches away. Costumes only: no lambda or other logos, no game UI or sprites. |
