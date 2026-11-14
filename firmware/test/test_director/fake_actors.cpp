@@ -7,6 +7,9 @@
 #include "mascot.h"
 #include "performer.h"
 #include "face.h"
+#include "pet.h"
+#include "party.h"
+#include "savers.h"
 #include "ui.h"
 #include "idle.h"
 #include "minimal_mode.h"
@@ -70,9 +73,12 @@ bool mascot_in_attention(void) {
 void mascot_set_working(bool on) { (void)on; }
 void mascot_autonomy(bool on) { m_autonomy = on; if (on && m_mode == M_SEATED) m_seated_since = now(); }
 
-bool mascot_act(const char*, uint8_t times, bool, uint16_t speed_pct) {
+const char* fake_last_act = NULL;
+
+bool mascot_act(const char* name, uint8_t times, bool, uint16_t speed_pct) {
     if (m_minimal) return false;
     if (!(m_mode == M_SEATED || (m_mode == M_ACT && m_act_auto))) return false;
+    fake_last_act = name;
     m_mode = M_ACT; m_act_auto = false;
     m_until = now() + scaled(1200 * (times ? times : 1), speed_pct);
     return true;
@@ -228,8 +234,59 @@ void face_blink(bool twice) { f_busy_until = now() + (twice ? 500 : 250); }
 void face_set_resting(bool) {}
 void face_look_at_x(int, uint32_t hold_ms) { f_busy_until = now() + hold_ms + 300; }
 
+// ─── Pet mode (pet.h) ────────────────────────────────────────────────────────
+// It drives the face while it's up; the director must have raised the face
+// first (pet_enter on a hidden face would be a pet nobody sees).
+static bool     pt_active = false;
+static uint32_t pt_since = 0;
+static int      pt_cheers = 0, pt_hunts = 0;
+void pet_init(void) {}
+void pet_enter(void) {
+    if (!face_visible()) { fputs("pet_enter with the face down\n", stderr); abort(); }
+    pt_active = true; pt_since = now();
+}
+void pet_leave(void) { pt_active = false; }
+bool pet_active(void) { return pt_active; }
+void pet_tick(uint32_t) {}
+bool pet_done(uint32_t t) { return pt_active && ((uint32_t)(t - pt_since) >= 20000 || world.asleep); }
+void pet_touch(bool, int, int) {}
+void pet_celebrate(void) { if (pt_active) pt_cheers++; }
+void pet_bug(void) { if (pt_active) pt_hunts++; }
+void pet_set_usage(float) {}
+bool fake_pet_active(void) { return pt_active; }
+int  fake_pet_cheers(void) { return pt_cheers; }
+int  fake_pet_hunts(void) { return pt_hunts; }
+
+// ─── Party (party.h) ─────────────────────────────────────────────────────────
+static int      py_confetti = 0, py_glows = 0;
+static uint32_t py_rgb = 0;
+void party_init(void) {}
+void party_confetti(void) { py_confetti++; }
+void party_glow(uint32_t rgb, int) { py_glows++; py_rgb = rgb; }
+bool party_active(void) { return false; }
+void party_stop(void) {}
+void party_tick(void) {}
+int  fake_confetti(void) { return py_confetti; }
+int  fake_glows(void) { return py_glows; }
+uint32_t fake_glow_rgb(void) { return py_rgb; }
+void fake_party_reset(void) { py_confetti = py_glows = 0; py_rgb = 0; pt_cheers = pt_hunts = 0; fake_last_act = NULL; }
+
+// ─── Effect screensavers (savers.h) ──────────────────────────────────────────
+static int sv_kind = -1;
+void saver_init(void) {}
+void saver_start(int kind) { if (kind >= 0 && kind < SAVER_COUNT) sv_kind = kind; }
+void saver_stop(void) { sv_kind = -1; }
+bool saver_active(void) { return sv_kind >= 0; }
+int  saver_kind(void) { return sv_kind; }
+const char* saver_name(int) { return ""; }
+void saver_tick(void) {}
+bool fake_saver_active(void) { return sv_kind >= 0; }
+int  fake_saver_kind(void) { return sv_kind; }
+
 // ─── The situation ───────────────────────────────────────────────────────────
 bool ui_meters_live(void) { return world.meters_live; }
+bool ui_header_hit(int, int y) { return y >= 0 && y < FAKE_HEADER_H; }
+int  ui_local_hour(void) { return -1; }
 void ui_set_alert_text(const char*) {}
 bool idle_is_asleep(void) { return world.asleep; }
 bool minimal_mode(void) { return false; }
@@ -253,6 +310,7 @@ OnScreen fake_on_screen(void) {
 }
 
 bool fake_corner_seated_still(void) { return m_mode == M_SEATED; }
+bool fake_corner_acting(void) { return m_mode == M_ACT; }
 bool fake_attention_animating(void) { return mascot_in_attention(); }
 
 int fake_clawds(const OnScreen& s) {

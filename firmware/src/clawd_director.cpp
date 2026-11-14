@@ -4,6 +4,10 @@
 #include "mascot.h"
 #include "performer.h"
 #include "face.h"
+#include "pet.h"
+#include "party.h"
+#include "savers.h"
+#include "theme_palette.h"
 #include "ui.h"
 #include "idle.h"
 #include "minimal_mode.h"
@@ -30,10 +34,12 @@ enum Beat {
     B_RUN_HOME,      // the performance stops, he runs off, the corner walks home
     B_ATTENTION,     // the big Clawd fetches you
     B_PEEK,          // a tap on the meters: hop, duck out, the face comes up curious for a while
+    B_PET,           // a tap on the header: duck out, the face comes up to be petted (pet.h)
     B_PAGE,          // the Clawd page has him (pages.h): nothing on the meters moves
 };
 static const char* const BEAT_NAMES[] = {
-    "home", "corner", "show", "screensaver", "face-home", "run-home", "attention", "peek", "page",
+    "home", "corner", "show", "screensaver", "face-home", "run-home", "attention", "peek", "pet",
+    "page",
 };
 
 static Beat     beat = B_HOME;
@@ -81,9 +87,23 @@ static int         peek_x = 0;                // where the peek's tap landed
 static uint32_t    peek_up_at = 0;            // the peek's face started rising
 static lv_indev_t* touch_indev = NULL;
 
+// Test runs (`e` t / f) and the screensaver's turns: style 0 is the resting
+// face (with its calm dips), 1..SAVER_COUNT an effect (savers.h), and each
+// screensaver takes the next one; an effect changes every saver_switch_ms.
+static TestParty   test_party;
+static int         saver_style = 0;
+static int         saver_turn = 0;
+static uint32_t    saver_since = 0;
+
 static uint32_t now_ms(void) { return millis(); }
 
 static void go(Beat b) {
+    if (beat == B_PET && b != B_PET) pet_leave();   // props off, eyes back, before the face drops
+    if (beat == B_SCREENSAVER && b != B_SCREENSAVER) saver_stop();
+    if (b == B_SCREENSAVER && beat != B_SCREENSAVER) {
+        saver_style = saver_turn;
+        saver_turn = (saver_turn + 1) % (SAVER_COUNT + 1);
+    }
     if (b != beat) Serial.printf("[%lu] director: %s -> %s\n", (unsigned long)now_ms(),
                                  BEAT_NAMES[beat], BEAT_NAMES[b]);
     beat = b;
@@ -152,8 +172,9 @@ static void to_meters(bool noticed) {
         go(B_FACE_HOME);
     } else if (performing) {
         go(B_RUN_HOME);
-    } else if (beat == B_SHOW || beat == B_SCREENSAVER) {
-        // Still on the meters (pointing / walking off): turn around.
+    } else if (beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PET) {
+        // Still on the meters (pointing / walking off, or an effect
+        // screensaver: go() takes it down as he turns around): turn around.
         if (attention_on) { go(B_ATTENTION); return; }
         mascot_return(-1, 150);
         go(B_CORNER);
@@ -236,24 +257,30 @@ bool director_take_dismissed(void) {
 // A tap while he's on the meters: tapping the aquarium always brings the face
 // up (clawd_tap_react). Seated, he hops first (the act opens on its crouch, so
 // he reacts on the next frame); otherwise he heads straight out.
-static void tap_home(int x) {
+static void tap_home(int x, int y) {
     TapInput in;
     in.on_meters = beat == B_HOME || beat == B_CORNER;
     in.minimal = minimal;
     in.corner = mascot_free() ? CORNER_FREE : mascot_out() ? CORNER_OUT : CORNER_BUSY;
-    TapReact r = clawd_tap_react(&in);
-    if (r == TAP_PEEK_HOP && !mascot_act("jumping", 1, true, PEEK_HOP_PCT)) r = TAP_PEEK;
-    if (r == TAP_PEEK) mascot_leave(PEEK_LEAVE_PCT);
-    if (r != TAP_NONE) {
-        react_anim = NULL;               // he's off to the glass; a queued corner reaction is moot
-        peek_x = x;
-        go(B_PEEK);
+    TapReact r = clawd_tap_react_at(&in, ui_header_hit(x, y), ui_meters_live());
+    if (r == TAP_PET) {
+        react_anim = NULL;
+        mascot_leave(PEEK_LEAVE_PCT);    // out through the nearest edge, quick; then the face
+        go(B_PET);
+    } else {
+        if (r == TAP_PEEK_HOP && !mascot_act("jumping", 1, true, PEEK_HOP_PCT)) r = TAP_PEEK;
+        if (r == TAP_PEEK) mascot_leave(PEEK_LEAVE_PCT);
+        if (r != TAP_NONE) {
+            react_anim = NULL;           // he's off to the glass; a queued corner reaction is moot
+            peek_x = x;
+            go(B_PEEK);
+        }
     }
-    Serial.printf("[%lu] director: tap at x %d -> %s\n", (unsigned long)now_ms(), x,
-                  r == TAP_PEEK_HOP ? "peek (hop)" : r == TAP_PEEK ? "peek (heads out)" : "absorbed");
+    Serial.printf("[%lu] director: tap at %d,%d -> %s\n", (unsigned long)now_ms(), x, y,
+                  r == TAP_PET ? "pet" : r == TAP_PEEK_HOP ? "peek (hop)" : r == TAP_PEEK ? "peek (heads out)" : "absorbed");
 }
 
-void director_tap(int x) {
+void director_tap(int x, int y) {
     engage();
     if (attention_on) { end_attention(ATTN_END_TAP); return; }   // a dismissing tap does nothing else
     resume_screensaver = false;                   // "show me the meters" wins
@@ -265,7 +292,14 @@ void director_tap(int x) {
     if (minimal) return;
     if (beat == B_HOME || beat == B_CORNER) {
         if (pairing_touch) return;                // the hint is the control now
-        tap_home(x);
+        tap_home(x, y);
+        return;
+    }
+    if (beat == B_PET) {
+        // The pet's own touches go to pet_touch (main.cpp). The header,
+        // where you came in, is the way back; elsewhere the tap is the
+        // pet's (or, before the face is up, absorbed).
+        if (ui_header_hit(x, y)) to_meters(false);
         return;
     }
     if (beat == B_PEEK) {
@@ -290,7 +324,7 @@ bool director_button(bool main_button) {
         return true;
     }
     resume_screensaver = false;
-    if (beat == B_SCREENSAVER) to_meters(false);
+    if (beat == B_SCREENSAVER || beat == B_PET) to_meters(false);
     return false;
 }
 
@@ -311,7 +345,26 @@ static void indev_cb(lv_event_t* e) {
     (void)e;
     lv_point_t p = { 0, 0 };
     if (touch_indev) lv_indev_get_point(touch_indev, &p);
-    director_tap(p.x);
+    director_tap(p.x, p.y);
+}
+
+// A test run's verdict: the edge glow, then confetti and his fanfare on a
+// pass, the bug hunt on a fail (clawd_test_react). On the meters the corner
+// Clawd plays it (hurrying home from a lurk trip first, like any reaction);
+// in pet mode the face does ("yay!" / a look around); while he's away (a
+// show, the screensaver, a peek) only the glow and the confetti show.
+static void on_test_run(bool pass) {
+    const TestReact r = clawd_test_react(&test_party, pass, minimal, now_ms(), &clawd_tuning());
+    if (r.glow) party_glow(theme_hex(pass ? TH_GREEN : TH_RED), pass ? 2 : 1);
+    if (r.confetti) party_confetti();
+    if (r.act == TEST_ACT_NONE) return;
+    Serial.printf("[%lu] director: tests %s\n", (unsigned long)now_ms(), pass ? "passed" : "failed");
+    if (beat == B_PET) {
+        if (pass) pet_celebrate();
+        else      pet_bug();
+        return;
+    }
+    react(r.act == TEST_ACT_FANFARE ? "trumpet" : "magnifier", 1);
 }
 
 void director_on_payload(const UsageData* d, const SignalsUpdate* sig) {
@@ -332,10 +385,13 @@ void director_on_payload(const UsageData* d, const SignalsUpdate* sig) {
     }
 
     if (sig->session_reset && !minimal && clawd_tuning().reactions) {
-        // Fresh window: jumping happy twice, the same moment as the chime if
-        // he's home, else when he gets back. Never on replays (signals only
-        // reports real samples). It outranks the notice / wave below.
-        if (beat == B_HOME && mascot_act("jumping happy", 2)) go(B_CORNER);
+        // Fresh window: confetti, and jumping happy twice, the same moment as
+        // the chime if he's home, else when he gets back (in pet mode the
+        // face cheers). Never on replays (signals only reports real
+        // samples). It outranks the notice / wave below.
+        party_confetti();
+        if (beat == B_PET) pet_celebrate();
+        else if (beat == B_HOME && mascot_act("jumping happy", 2)) go(B_CORNER);
         else {
             joy_pending = true;
             joy_at = now_ms();
@@ -357,12 +413,17 @@ void director_on_payload(const UsageData* d, const SignalsUpdate* sig) {
             }
         } else if (sig->event == 's' && wave) {
             react("waving", 1);
+        } else if (sig->event == 't' || sig->event == 'f') {
+            on_test_run(sig->event == 't');
         }
     }
 }
 
 // ─── Minimal mode ────────────────────────────────────────────────────────────
 static void apply_minimal(bool on) {
+    if (beat == B_PET) pet_leave();           // go() is skipped below
+    saver_stop();
+    party_stop();
     minimal = on;
     react_anim = NULL;                        // a queued corner reaction is moot now
     resume_screensaver = false;
@@ -382,6 +443,8 @@ static void apply_minimal(bool on) {
 // ─── Init ────────────────────────────────────────────────────────────────────
 void director_init(void) {
     face_init();
+    pet_init();          // its props draw over the face
+    test_party_clear(&test_party);
     show_gate_clear(&show_gate);
     turn_clear(&turn);
     clawd_rng_seed(&rng, now_ms() ^ 0xD1EC7u);
@@ -466,9 +529,33 @@ static void run_show(uint32_t now) {
 
 static uint32_t calm_at = 0;
 
+// An effect screensaver: he walks off, the effect runs (no Clawd on screen)
+// and changes to the next one now and then. It ends like the rest of the
+// screensaver (to_meters): go() takes it down as he walks back to his seat.
+static void run_effect_saver(uint32_t now) {
+    if (step == 0) {
+        mascot_leave(100);
+        next_step();
+        return;
+    }
+    if (step == 1) {
+        if (!mascot_away()) return;
+        saver_start(saver_style - 1);
+        saver_since = now;
+        next_step();
+        return;
+    }
+    if ((uint32_t)(now - saver_since) >= clawd_tuning().saver_switch_ms) {
+        saver_style = saver_style % SAVER_COUNT + 1;   // the next effect
+        saver_start(saver_style - 1);
+        saver_since = now;
+    }
+}
+
 static void run_screensaver(uint32_t now) {
     const ClawdTuning& t = clawd_tuning();
     if (!ui_meters_live()) { to_meters(false); return; }   // link dropped: show the hint
+    if (saver_style > 0) { run_effect_saver(now); return; }
     if (step == 3) {
         // Resting: dip into a calm performance now and then (also breaks up
         // the flat orange field for burn-in). One Clawd: the face drops onto
@@ -682,7 +769,8 @@ static void run_page(uint32_t now) {
 bool director_page_open(void) {
     if (beat == B_PAGE) return true;
     if (minimal) return false;
-    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PEEK) {
+    if (face_visible() || performing || beat == B_SHOW || beat == B_SCREENSAVER || beat == B_PEEK ||
+        beat == B_PET) {
         engage();
         resume_screensaver = false;
         to_meters(false);                     // "show me the meters" first
@@ -716,6 +804,33 @@ bool        director_claude_working(void)  { return working_now; }
 bool        director_alert_active(void)    { return attention_on; }
 const char* director_alert_message(void)   { return alert_message; }
 
+// A tap on the header. One Clawd: the corner Clawd ducks out first (tap_home
+// sent him), then the face comes up and pet.cpp has it until you tap the
+// header again, press a button, leave it alone long enough (pet_done), or
+// something outranks it (an alert, the link dropping).
+static void run_pet(uint32_t now) {
+    if (!ui_meters_live()) { to_meters(false); return; }   // link dropped: show the hint
+    switch (step) {
+    case 0:   // he's ducking out
+        if (!settled(now) || !mascot_away()) return;
+        face_rise();
+        next_step();
+        break;
+    case 1:   // up and settled: the pet takes over
+        if (!settled(now)) return;
+        pet_enter();
+        next_step();
+        break;
+    default:
+        pet_tick(now);
+        if (pet_done(now)) {
+            Serial.printf("[%lu] director: pet over (left alone)\n", (unsigned long)now);
+            to_meters(false);
+        }
+        break;
+    }
+}
+
 void director_tick(void) {
     const uint32_t now = now_ms();
     const int activity = signals_activity();
@@ -735,6 +850,7 @@ void director_tick(void) {
     case B_RUN_HOME:    run_run_home(now); break;
     case B_ATTENTION:   run_attention(now); break;
     case B_PEEK:        run_peek(now); break;
+    case B_PET:         run_pet(now); break;
     case B_PAGE:        run_page(now); break;
     }
 }
@@ -757,12 +873,29 @@ bool director_debug(const char* name) {
         joy_at = now_ms();
         return true;
     }
+    if (strcmp(name, "pet") == 0) {       // pet mode now, as a tap on the header would
+        if (beat != B_HOME && beat != B_CORNER) return false;
+        engage();
+        resume_screensaver = false;
+        TapInput in = { true, minimal, mascot_free() ? CORNER_FREE : CORNER_OUT };
+        if (clawd_tap_react_at(&in, true, ui_meters_live()) != TAP_PET) return false;
+        react_anim = NULL;
+        mascot_leave(PEEK_LEAVE_PCT);
+        go(B_PET);
+        return true;
+    }
+    if (strcmp(name, "pass") == 0 || strcmp(name, "fail") == 0) {   // a test run's verdict, as `e` t / f
+        engage();
+        on_test_run(name[0] == 'p');
+        return true;
+    }
+    if (strcmp(name, "confetti") == 0) { party_confetti(); return true; }
     if (strncmp(name, "peek", 4) == 0) {  // the peek now, as a tap at x would; `clawd peek <x>`
         if (beat != B_HOME && beat != B_CORNER) return false;
         const int x = name[4] == ' ' ? atoi(name + 5) : lv_display_get_horizontal_resolution(NULL) * 3 / 4;
         engage();
         resume_screensaver = false;
-        tap_home(x);
+        tap_home(x, lv_display_get_vertical_resolution(NULL) * 3 / 4);
         return beat == B_PEEK;
     }
     if (strcmp(name, "lurk") == 0) {      // a lurk trip now (to QA cutting it short)
@@ -770,8 +903,15 @@ bool director_debug(const char* name) {
         return mascot_lurk();
     }
     const bool show = strcmp(name, "show") == 0;
-    if (!show && strcmp(name, "screensaver") != 0) return false;
+    // `clawd screensaver [n]`: n = 0 the face, 1..3 an effect (savers.h).
+    const bool saver = strncmp(name, "screensaver", 11) == 0 && (name[11] == 0 || name[11] == ' ');
+    if (!show && !saver) return false;
     if (beat != B_HOME) return false;     // finish the current beat first (`clawd home`)
+    if (saver && name[11] == ' ') {
+        const int n = atoi(name + 12);
+        if (n < 0 || n > SAVER_COUNT) return false;
+        saver_turn = n;
+    }
     go(show ? B_SHOW : B_SCREENSAVER);
     return true;
 }

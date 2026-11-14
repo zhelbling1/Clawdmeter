@@ -17,7 +17,11 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
 | `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. An LVGL image with PSRAM; drawn straight to the panel on boards with `direct_performer` (see "Boards without PSRAM"). |
 | `firmware/src/direct_sprite.{h,cpp}` | A full-size Clawd drawn straight to the panel without a screen-sized buffer, for `direct_performer` boards: the performer, the lurk trip and the attention walk-on use it there. Its diff and blit sizing are pure and unit-tested in `test/test_direct_sprite`. Ported from [Faith012/Clawdmeter](https://github.com/Faith012/Clawdmeter). |
-| `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver and the held peek. |
+| `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver, the held peek and pet mode's face (per-eye offsets, eye shape, a held squint: `face_look_each`, `face_set_eye_shape`, `face_set_squint`). |
+| `firmware/src/pet.{h,cpp}`, `pet_props.{h,cpp}` | Pet mode: drives the face while the `pet` beat has it up (touch, tilt, moods, gags) and draws its props (sweat drop, z z Z, thinking dot, speech pill) with one draw-callback object. |
+| `firmware/src/pet_mood.{h,cpp}` | Pet mode's pure rules, unit-tested in `test/test_pet_mood`: moods, boop / stroke / shake reactions, tilt, gag timing. |
+| `firmware/src/party.{h,cpp}` | Confetti and the edge glow (a test run, a fresh window): one draw-callback object over everything. Not a creature. |
+| `firmware/src/savers.{h,cpp}` | The effect screensavers (starfield, code rain, constellation): one draw-callback object over the meters. No Clawd in them. |
 | `firmware/src/face_motion.{h,cpp}` | The face's rise and drop as a pure function of time (vertical only, one size: overshoot and settle, anticipation, follow-through; see "The face's motion"), unit-tested in `test/test_face_motion`. |
 | `firmware/src/field.{h,cpp}` | A flat-colour shape on an overlay layer (a rectangle plus two small extra rectangles) that redraws only the strips that change colour (see "Redraw cost and frame rate"). The face is a field. |
 | `firmware/src/perf.{h,cpp}` | The `perf` serial command: refresh count, timing and pixels sent for the last face rise, its settle, face drop and performance. |
@@ -35,7 +39,10 @@ what you want (see "A tap on the meters" below).
 fades back in before he notices you; an alert already did. A Stop or tool
 activity does not wake the panel: Claude working alone isn't you. Taps come straight
 from LVGL: an indev `LV_EVENT_PRESSED` callback, so the reaction starts on the
-next frame, not on release.
+next frame, not on release. In pet mode `main.cpp` also hands the latched
+touch to `pet_touch()` every loop (the eyes follow the finger; a short tap
+is a boop on its release, a rub a stroke). `party_tick()` and `saver_tick()`
+run every loop and cost nothing while idle.
 
 ## Rooms
 
@@ -100,10 +107,11 @@ passed. Beat changes always print; every step prints too after
 | `home`, working | Claude is working (`clawd_working`: a prompt with no Stop yet, with the prompt or the last tool activity under 10 min ago, or activity 1+ once a minute has passed since the last Stop) | His idle acts and lurk trips give way to the laptop (the official laptop act): he opens it, types in its loop for as long as the work goes on, then closes it and sits back down; 400 ms later he opens it again if Claude is still at it. Reactions (noticing, the long-turn wave, joy) and every other beat still cut in; one that waits for him (a show) gets him once he has closed the laptop, since he stops typing when his autonomy goes off. Needs idle acts on (liveliness 2+) and headroom above the seat for its 23 rows. |
 | `corner` | notice, wave, joy, or after a transition | Waits for the commanded corner act or walk to finish, then `home`. |
 | `show` | `a == 3` held for 5 min; at most one per 15 min; hooks seen; meters live | Points at the bar (or, if he's out on a lurk trip, heads straight out), walks off left at 1.5×, walks back on full size at 1.5×, one scene (loop held 16 s, so about 20 s), waves, walks off left, and the corner Clawd walks back in to his seat. Without the performer (no PSRAM and no `direct_performer`): points, then dances twice (jumps for joy twice when usage is Heavy) and waves, all in his seat. |
-| `screensaver` | 10 min with no engagement; needs hooks seen or a window that hasn't started (spend-capped and `week` accounts have no window, so they need hooks); meters live | Walks off through the nearest edge (a lurk trip finishes its peek first), face rises and rests (blinks every 2–6 s, about one in five a double, glances where the far eye travels 1.5×). Every 3–5 min, a calm dip: the face drops onto the meters, he walks on, plays one calm scene (magnifier, walking, book, eating, idle blossom or idle hearts, never the same twice running) and walks off, then the face rises and he rests again. Without the performer the corner Clawd walks back to his seat, sits for the scene's length and walks off again. |
+| `screensaver` | 10 min with no engagement; needs hooks seen or a window that hasn't started (spend-capped and `week` accounts have no window, so they need hooks); meters live | Takes turns: the face, then each effect screensaver (below), one per screensaver. The face: walks off through the nearest edge (a lurk trip finishes its peek first), face rises and rests (blinks every 2–6 s, about one in five a double, glances where the far eye travels 1.5×). Every 3–5 min, a calm dip: the face drops onto the meters, he walks on, plays one calm scene (magnifier, walking, book, eating, idle blossom or idle hearts, never the same twice running) and walks off, then the face rises and he rests again. Without the performer the corner Clawd walks back to his seat, sits for the scene's length and walks off again. |
 | `face-home` | tap, prompt, button or attention while the screensaver face is up; a tap, attention or the end of its curiosity while the peek face is up | If woken by a prompt or tapped during a peek, he blinks first (noticing), then the face drops into the meters, and the corner hurries home at 1.5×. |
 | `run-home` | tap or attention during a performance; a tap, prompt, button or usage moving during a calm dip | The scene releases to the idle pose on the spot, holds 200 ms, and he runs off left, ramping from 1.5× to 3× over 400 ms. Once he's gone, the corner walks home at 1.5×. |
 | `peek` | any tap on the meters (`home` or `corner`), live or stale (below) | Seated: a startled hop (`jumping` from its crouch, 2×), then he ducks out through the nearest edge at 4×; already moving or out: straight out at 4×. The face rises, eyes glance toward the tap's x and hold 1.6–2.4 s, a blink (30 % double), the look comes back to you, and the face stays up, curious, for 5 min: resting like the screensaver face (blinks every 2–6 s, some double), its glances going back toward the tap most of the time. Then it goes back on its own; a tap sends it back right away (with the acknowledging blink). Both go through `face-home`: the drop, and he walks back to his seat at 1.5×. (below: what else happens while it's up) |
+| `pet` | a tap on the header (the title, the battery, or Clawd in his seat: everything above the first card, `ui_header_hit`) from `home` or `corner`, meters live; `clawd pet` | He ducks out through the nearest edge at 4×, the face rises, and pet mode has it (below) until a tap on the header, a button press, 2 min without a touch or shake, the panel going to sleep, an alert or the link dropping. All of them go through `face-home`: the drop, and he walks back to his seat. On stale or pairing meters a header tap is a plain peek. |
 | `page` | the Clawd page opens (PWR, `page 1`; only from `home` or `corner`) | The corner Clawd is put away at once (the page covers the meters) and nothing on the meters moves: no show, screensaver, reaction or peek. An alert runs its clock and shows on the page; a tap dismisses it, the next tap (or PWR, or `clawd home`) closes the page and he walks back to his seat, or the attention beat takes over if the alert is still up. See "The Clawd page". |
 | `attention` | `m` (alert) in a payload | The corner walks off at 2×, the big Clawd (12 px cells) walks on at 2×, then waves and points alternately (no full-size sprite: he waves and points in his seat). The alert lasts until a tap, `x` (clear) or 2 min; his animation lasts the **attention animation** time (below), 2 min by default, after which the big one walks off left and the corner Clawd sits in his seat while the alert stays up. Off: no animation, he sits in his seat. A new alert animates again. Interrupts a show or the screensaver through `face-home` / `run-home`, and then returns to where it left off (below). |
 
@@ -160,14 +168,76 @@ Small reactions on the meters, from `home` or `corner`:
   back to his seat at 2.5× (or turns around if he was still heading out), and
   then reacts. The reaction waits up to 15 s (`react_pending_ms`) for him. A
   reaction arriving while a commanded act plays queues behind it.
+- **Tests passed / failed**: `e:"t"` / `e:"f"` (the app reads the verdict
+  from the shell call that ran them, below). The screen edge glows green
+  (two pulses) or red (one), the palette's `TH_GREEN` / `TH_RED`, whatever
+  room he's in. A pass also gets confetti and his fanfare (the official
+  `trumpet` act in his seat); a fail sends him looking for the bug (the
+  `magnifier` act). A changed verdict always gets its reaction (failing to
+  passing is the fix landing); the same verdict again only once per
+  `party_cooldown_ms` (5 min), so a test loop isn't a party a minute
+  (`clawd_test_react`). In pet mode the face does it instead ("yay!", or a
+  look around with "a bug?"); while he's away (a show, the screensaver, a
+  peek) only the glow and the confetti show. No-nonsense keeps the glow and
+  drops the rest; minimal mode shows nothing.
 - **Fresh window**: `session_reset` from signals (real samples only, so never
-  on a replay). For a `week` account (no 5-hour limit) the main meter is
+  on a replay). Confetti, and: For a `week` account (no 5-hour limit) the main meter is
   the week, so this is the weekly reset. A change in what the meter
   measures (session, week or spend: `usage_meter_kind`) restarts the slow
   clock and is never a reset or a rise. He jumps happy twice, in the same
   loop iteration as the chime.
   If he's out on a trip he hurries back for it; if he's in another room it
   waits up to 5 min for him to sit down. It outranks the wave.
+
+### Pet mode
+
+A tap on the header brings the face up for you (`pet`). It is the same face
+as the screensaver and the peek, THE Clawd: he ducks out before it rises and
+it drops before he walks back, so the one-Clawd rule holds (`test_director`
+also fails if the pet ever drives a face that isn't up, or runs outside its
+beat). `pet.cpp` drives the eyes every frame:
+
+- **Where it looks**: your finger while one is on the glass, else the
+  thinking dot (while Claude works, `a > 0`), else the tilt: the change from
+  how the board stood when the face came up (an upright desk stand reads 1 g
+  down the screen; that is level), up to 45° to the edge. Tilt and shake
+  need an accelerometer reading (`imu_hal_accel`, screen axes; the QMI8658
+  AMOLED-2.16 boards, S3 and C6; a weak default returns none elsewhere).
+- **Reactions**: a boop (a short tap) squints, sometimes with "boop!"; five
+  boops within 6 s make it grumpy for 8 s (lids down, "hmph!", it looks
+  away); a rub (sideways travel adding up to a third of the panel) makes it
+  happy for 5 s ("prrr~", a wiggle) and clears grumpy; a shake (three jolts
+  over 0.6 g within 1.5 s) makes it dizzy for 3 s (eyes circling out of
+  step, "whoa~"), then ignores shaking for 2 s.
+- **Moods** (`pet_mood`, highest first): dizzy, grumpy, happy, worried (the
+  meters at 90 %+: a sweat drop), sleepy (23:00–05:59 by the app's clock,
+  unless Claude is working: lids low, z z Z), bored (45 s untouched and
+  idle: lids half down, the eyes drifting), content.
+- **Gags**, every 20–45 s when nothing else is going on: a sneeze
+  ("ah... ACHOO!"), a run of 2–4 hiccups, a yawn (likelier when sleepy or
+  bored); in the morning (06:00–09:59) a stretch comes first, 3–6 s in.
+- **The party**: a fresh window or tests passing makes it hop ("yay!"),
+  tests failing makes it look around ("a bug?"); the confetti and glow are
+  the party's own.
+
+The props (`pet_props.cpp`) are drawn by one draw-callback object, so they
+cost no LVGL objects or layer buffers. Adapted from
+[matejkrajcovic111-ctrl/Clawdmeter](https://github.com/matejkrajcovic111-ctrl/Clawdmeter).
+
+### Effect screensavers
+
+Every other screensaver is the resting face; the rest take turns between
+three effects (`savers.cpp`): a starfield (stars speeding out of the
+centre, short trails), a code rain (columns of `font_mono_18` glyphs in
+Clawd's orange, brightest at the head) and a constellation (drifting dots
+joined by faint lines when close). Each turn of the screensaver takes the
+next style (face, starfield, rain, constellation, face, ...), and a running
+effect moves on to the next one every 4 min (`saver_switch_ms`). Mostly
+black, never above ~70 % opacity, everything moving: OLED-friendly. He walks
+off before an effect starts, and anything that ends the screensaver takes
+it down as he turns around to walk back (`test_director` fails if a Clawd is
+ever on screen with an effect). They draw from fixed arrays sharing one
+~1.5 KB block, 20–30 fps, nothing while the panel sleeps.
 
 ### A tap on the meters (the aquarium)
 
@@ -370,10 +440,13 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
 
 ## Boards without PSRAM (C6)
 
-- Corner Clawd: animated. Its buffer, sized by area for the largest corner
-  act (the laptop, 34×23 cells × 3 px, about 21 KB; each frame is drawn at
-  its own size, so the wider but shorter laptop and the taller jumps share
-  it), falls back to internal RAM.
+- Corner Clawd: animated. Its buffer, sized for the largest corner act by
+  area (the trumpet, 50×21 cells × 3 px, about 28 KB; each frame is drawn at
+  its own size, so the laptop, idle hearts and the jumps share it), falls
+  back to internal RAM. An act that wouldn't fit plays `dancing` instead.
+- Pet mode, the party and the effect screensavers: draw callbacks over fixed
+  arrays (about 1.5 KB of confetti, 1.5 KB shared by the effects), no
+  pixel buffers: the same as on S3.
 - The Clawd page: the same as on S3. It draws Clawd straight from the
   frames and the scenery from const tables, so it needs no buffer.
 - Face: plain LVGL objects, the same as on S3.
@@ -541,9 +614,11 @@ cooldown 15 min, show scene loop 16 s, quiet 10 min, calm dip every 3–5 min,
 calm scene loop 10 s, alert timeout 2 min, long turn 2 min, joy wait 5 min,
 reaction wait 15 s, blinks every 2–6 s, peek look 1.6–2.4 s, peek
 curiosity 5 min, double blink on a peek 30 %, curious glances back toward the
-tap 60 %. `clawd_tuning_fast()` compresses them for the sim (`SIM_FAST=1`;
-the peek's curiosity becomes 12 s, under the 15 s quiet time as in the
-defaults).
+tap 60 %, the same test verdict's reaction again after 5 min, an effect
+screensaver's switch every 4 min. `clawd_tuning_fast()` compresses them for
+the sim (`SIM_FAST=1`; the peek's curiosity becomes 12 s, under the 15 s
+quiet time as in the defaults; 20 s for the test reaction and the effect
+switch). Pet mode's own timings are `PET_*` in `pet_mood.h`.
 
 ## Liveliness
 
@@ -557,7 +632,7 @@ change at once (a show or screensaver the new level rules out goes home).
 
 | Level | What changes |
 |---|---|
-| 1 No-nonsense | No shows, screensaver, idle acts or lurk trips, and no reactions (noticing, long-turn wave, fresh-window joy). The status line's verb changes once a minute and the spinner holds still, so with no taps or alerts only the clock and that word redraw. A tap still gets the peek, an alert still gets the attention walk-on. |
+| 1 No-nonsense | No shows, screensaver, idle acts or lurk trips, and no reactions (noticing, long-turn wave, fresh-window joy and confetti, the test fanfare and bug hunt; a test run's edge glow stays). The status line's verb changes once a minute and the spinner holds still, so with no taps or alerts only the clock and that word redraw. A tap still gets the peek, an alert still gets the attention walk-on. |
 | 2 | Rate-like timings ÷ 0.6: show after ~8.3 min, cooldown 25 min, calm dips every 5–8.3 min, corner still time ×1.67, wave after a 3.3-min turn. |
 | 3 Some-nonsense | The base timings above. |
 | 4 | ÷ 1.8: show after ~2.8 min, cooldown ~8.3 min, calm dips every ~1.7–2.8 min, still time ×0.56, wave after ~67 s. |
@@ -589,13 +664,17 @@ at Off / 10 s / 30 s (`test_director`). In the sim:
 
 ## QA
 
-- Native: `pio test -d firmware -e native -f test_clawd_policy` (the rules)
-  and `-f test_director` (the director against timed stand-ins for its
-  actors: one Clawd on screen at every tick of a seeded fuzz, every beat
-  reached, and nothing left hanging once the input stops; also with only
-  one of the performer and the full-size sprite, as a `direct_performer`
-  board has when only one of their grids could be allocated), and
-  `-f test_direct_sprite` (the direct path's diff and blit sizing).
+- Native: `pio test -d firmware -e native -f test_clawd_policy` (the rules),
+  `-f test_pet_mood` (pet mode's moods, reactions, tilt and gags),
+  `-f test_direct_sprite` (the direct path's diff and blit sizing) and
+  `-f test_director` (the director against timed stand-ins for its
+  actors: one Clawd on screen at every tick of a seeded fuzz with header
+  taps, test verdicts and the Clawd page in it, no Clawd under an effect
+  screensaver, pet mode only on a face that's up, every beat reached, and
+  nothing left hanging once the input stops; also with only one of the
+  performer and the full-size sprite, as a `direct_performer` board has
+  when only one of their grids could be allocated; plus pet mode's ways
+  out, the test-run party, the screensaver's turns and the page).
 - Sim: `SIM_FAST=1 SIM_SCENARIO=sim/director.jsonl`, plus `SIM_SHOTS` /
   `SIM_TAPS` for headless capture (see `docs/simulator.md`) and `SIM_TRACE=1` for
   the per-step trace. The interruptions (lurk cut short, attention resuming
@@ -641,9 +720,11 @@ and Off, 35-peek-* a tap on the meters: crouch, hop, ducks
   BLE link first: the tap on the pairing hint gets the face just the same.
   For the stale (dimmed) meters, let one payload go 90 s without a refresh
   and tap after that.
-- Hardware: send `clawd show`, `clawd screensaver`, `clawd attention`,
-  `clawd joy`, `clawd lurk`, `clawd peek [x]` (the peek now, as a tap at x)
-  or `clawd home` on the serial console, then `screenshot`
+- Hardware: send `clawd show`, `clawd screensaver [n]` (n: 0 the face, 1
+  starfield, 2 code rain, 3 constellation), `clawd attention`, `clawd joy`,
+  `clawd lurk`, `clawd peek [x]` (the peek now, as a tap at x), `clawd pet`,
+  `clawd pass` / `clawd fail` (a test verdict, as `e` t / f), `clawd
+  confetti` or `clawd home` on the serial console, then `screenshot`
   (`.claude/skills/capturing-device-screenshots/scripts/screenshot.py`). This replaces swapping the boot screen in `main.cpp`.
   The device boots to the meters. `perf` prints the redraw cost of the last
   face rise, face drop and performance (below).

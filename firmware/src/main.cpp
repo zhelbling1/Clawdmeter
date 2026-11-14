@@ -32,6 +32,9 @@
 #include "button_action.h"
 #include "hal/power_hal.h"
 #include "hal/imu_hal.h"
+#include "pet.h"
+#include "party.h"
+#include "savers.h"
 #include "hal/sound_hal.h"
 #include "hal/board_info_hal.h"
 
@@ -80,6 +83,7 @@ static void rounder_cb(lv_event_t* e) {
 // A finger is on the panel (after the wake filter below); read by the
 // touch-hold re-pair on boards without a PWR button.
 static bool touch_down = false;
+static int  touch_x = 0, touch_y = 0;   // where it is (pet mode follows it from loop())
 
 static void my_touch_cb(lv_indev_t* indev, lv_indev_data_t* data) {
     uint16_t x, y;
@@ -112,6 +116,7 @@ static void my_touch_cb(lv_indev_t* indev, lv_indev_data_t* data) {
     }
 
     touch_down = pressed;
+    if (pressed) { touch_x = x; touch_y = y; }
     if (pressed) {
         data->point.x = x;
         data->point.y = y;
@@ -357,6 +362,8 @@ void setup() {
     ui_update_ble_status(ble_get_state(), ble_get_device_name(), ble_get_mac_address());
     ui_update_battery(power_hal_battery_pct(), power_hal_is_charging(), power_hal_is_vbus_in());
     director_init();    // rooms + beats; boots on the meters (home)
+    saver_init();       // effect screensavers, over the meters (hidden)
+    party_init();       // confetti and the edge glow, over the face (hidden)
     clawd_prefs_init();  // the saved device settings, before the app says otherwise
     pages_init();        // the Clawd page, where its scene fits the panel
 
@@ -521,6 +528,9 @@ void loop() {
     mascot_tick();
     director_tick();
     pages_tick();
+    pet_touch(touch_down, touch_x, touch_y);   // pet mode only: the eyes follow, rubs, boops
+    party_tick();
+    saver_tick();
     if (director_take_dismissed()) {
         ble_send_dismiss();
         if (serial_link_active()) serial_link_send_dismiss();
@@ -696,6 +706,8 @@ void loop() {
                 idle_note_activity();
             if (usage.liveliness > 0) liveliness_set(usage.liveliness);
             if (usage.attn_anim_s >= 0) attn_anim_set(usage.attn_anim_s);
+            if (usage.ok)   // "no data" is never a 0 %
+                pet_set_usage(usage.session_pct > usage.weekly_pct ? usage.session_pct : usage.weekly_pct);
             director_on_payload(&usage, &sig);
             if (usage.alert_msg[0]) {
                 Serial.println("attention — mascot");

@@ -41,6 +41,9 @@ struct ClawdTuning {
     uint16_t idle_gap_pct;       // the corner's still time between acts, % of the mood's base
     uint32_t verb_ms;            // the status line's thinking verb changes this often
     bool     spinner;            // the status line's spinner turns
+    uint32_t party_cooldown_ms;  // the same test verdict again gets its party / bug hunt
+                                 // once per this long (a changed verdict always does)
+    uint32_t saver_switch_ms;    // an effect screensaver changes effect this often
 };
 
 // The effective tuning: the base (defaults, or the sim's fast set) scaled
@@ -207,6 +210,7 @@ enum TapReact {
     TAP_NONE,       // minimal mode, or not on the meters (the tap means something else)
     TAP_PEEK_HOP,   // seated or idling: startled hop, duck out, the face
     TAP_PEEK,       // already moving or out: straight out through an edge, the face
+    TAP_PET,        // on the header with live meters: out, and the face comes up to be petted
 };
 enum CornerState {
     CORNER_FREE,   // seated, or in an idle act of his own (interruptible)
@@ -219,6 +223,34 @@ struct TapInput {
     CornerState corner;
 };
 TapReact clawd_tap_react(const TapInput* in);
+// A tap on the header (the title, or Clawd in his seat) with live meters is
+// pet mode instead (TAP_PET): he ducks out and the face comes up to be
+// petted (pet.h). Off the meters, minimal or stale, it's what any tap is.
+TapReact clawd_tap_react_at(const TapInput* in, bool header, bool meters_live);
+
+// ─── Test runs (`e` = `t` passed / `f` failed) ──────────────────────────────
+// The app reads the verdict from the shell call that ran the tests (desktop
+// clawdmeter-core::testrun). The edge glow (green / red, the palette's
+// TH_GREEN / TH_RED) is the information and always shows outside minimal
+// mode; the rest is Clawd's reaction, under `reactions`: a pass gets
+// confetti and his fanfare (the trumpet), a fail sends him looking for the
+// bug (the magnifier). A changed verdict always gets its reaction (failing ->
+// passing is the fix landing); the same verdict again only once per
+// party_cooldown_ms, so a test loop isn't a party every minute.
+enum TestAct { TEST_ACT_NONE, TEST_ACT_FANFARE, TEST_ACT_BUG_HUNT };
+struct TestParty {
+    bool     have;          // a verdict has been seen
+    bool     last_pass;
+    bool     reacted;       // a reaction has played since boot
+    uint32_t reacted_at;
+};
+struct TestReact {
+    bool    glow;           // pulse the edge: green on a pass, red on a fail
+    bool    confetti;
+    TestAct act;
+};
+void      test_party_clear(TestParty* p);
+TestReact clawd_test_react(TestParty* p, bool pass, bool minimal, uint32_t now, const ClawdTuning* t);
 
 // The peek's face is curious for a while: after the look and the blink it
 // rests on the glass (irregular blinks, some double, glances that keep going

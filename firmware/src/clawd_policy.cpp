@@ -33,6 +33,8 @@ void clawd_tuning_defaults(ClawdTuning* t) {
     t->idle_gap_pct      = 100;
     t->verb_ms           = 4 * SEC;
     t->spinner           = true;
+    t->party_cooldown_ms = 5 * MIN;
+    t->saver_switch_ms   = 4 * MIN;
 }
 
 void clawd_tuning_fast(ClawdTuning* t) {
@@ -48,6 +50,8 @@ void clawd_tuning_fast(ClawdTuning* t) {
     t->long_turn_ms     = 10 * SEC;
     t->joy_pending_ms   = 30 * SEC;
     t->peek_curious_ms  = 12 * SEC;   // under quiet_ms, as the defaults are
+    t->party_cooldown_ms = 20 * SEC;
+    t->saver_switch_ms  = 20 * SEC;
 }
 
 // ─── Liveliness ──────────────────────────────────────────────────────────────
@@ -259,6 +263,34 @@ bool reaction_still_due(uint32_t queued_at, uint32_t now, const ClawdTuning* t) 
 TapReact clawd_tap_react(const TapInput* in) {
     if (in->minimal || !in->on_meters) return TAP_NONE;
     return in->corner == CORNER_FREE ? TAP_PEEK_HOP : TAP_PEEK;
+}
+
+TapReact clawd_tap_react_at(const TapInput* in, bool header, bool meters_live) {
+    const TapReact r = clawd_tap_react(in);
+    return (r != TAP_NONE && header && meters_live) ? TAP_PET : r;
+}
+
+void test_party_clear(TestParty* p) {
+    p->have = false;
+    p->last_pass = false;
+    p->reacted = false;
+    p->reacted_at = 0;
+}
+
+TestReact clawd_test_react(TestParty* p, bool pass, bool minimal, uint32_t now, const ClawdTuning* t) {
+    TestReact r = { false, false, TEST_ACT_NONE };
+    const bool changed = !p->have || p->last_pass != pass;
+    p->have = true;
+    p->last_pass = pass;
+    if (minimal) return r;
+    r.glow = true;
+    if (!t->reactions) return r;
+    if (!changed && p->reacted && (uint32_t)(now - p->reacted_at) < t->party_cooldown_ms) return r;
+    p->reacted = true;
+    p->reacted_at = now;
+    r.confetti = pass;
+    r.act = pass ? TEST_ACT_FANFARE : TEST_ACT_BUG_HUNT;
+    return r;
 }
 
 PeekHold peek_hold(uint32_t up_since, uint32_t now, const ClawdTuning* t) {

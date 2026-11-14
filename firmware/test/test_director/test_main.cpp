@@ -1,6 +1,8 @@
 // The director against timed stand-ins for its actors (fake_actors.cpp):
 // whatever the situation does, there is never more than one Clawd on screen
-// (corner sprite, full-size sprite, performer, face).
+// (corner sprite, full-size sprite, performer, face). Pet mode drives that
+// same face and only while it's up; an effect screensaver runs only with no
+// Clawd on screen at all.
 //   pio test -d firmware -e native -f test_director
 #include <unity.h>
 #include "fake_world.h"
@@ -11,17 +13,25 @@ static const uint32_t TICK_MS = 10;
 // The first frame that broke the rule, if any.
 static bool     broke = false;
 static uint32_t broke_at = 0;
-static char     broke_what[96];
+static char     broke_what[160];
 
 static void check_one_clawd(void) {
     const OnScreen s = fake_on_screen();
+    if (broke) return;
     // The Clawd page (pages.cpp) shows him while the director says it has him.
     const bool page = director_on_page();
-    if (broke || fake_clawds(s) + (int)page <= 1) return;
+    const int  clawds = fake_clawds(s) + (int)page;
+    const char* what = clawds > 1                              ? "two Clawds"
+                     : fake_saver_active() && clawds           ? "a Clawd under the effect screensaver"
+                     : fake_pet_active() && !s.face            ? "pet mode without the face"
+                     : fake_pet_active() && beat != B_PET      ? "pet mode outside its beat"
+                     : fake_saver_active() && beat != B_SCREENSAVER ? "an effect screensaver outside its beat"
+                                                               : NULL;
+    if (!what) return;
     broke = true;
     broke_at = fake_now_ms;
-    snprintf(broke_what, sizeof(broke_what), "beat %s:%u corner %d big %d performer %d face %d page %d",
-             director_beat_name(), step, s.corner, s.big, s.performer, s.face, page);
+    snprintf(broke_what, sizeof(broke_what), "%s: beat %s:%u corner %d big %d performer %d face %d page %d",
+             what, director_beat_name(), step, s.corner, s.big, s.performer, s.face, page);
 }
 
 // Which beats a run went through, so a fuzz pass can't be vacuous.
@@ -48,8 +58,8 @@ static void assert_every_beat_seen(bool has_performer) {
 
 static void assert_one_clawd(void) {
     if (!broke) return;
-    char msg[160];
-    snprintf(msg, sizeof(msg), "two Clawds at %lu ms: %s", (unsigned long)broke_at, broke_what);
+    char msg[200];
+    snprintf(msg, sizeof(msg), "at %lu ms: %s", (unsigned long)broke_at, broke_what);
     TEST_FAIL_MESSAGE(msg);
 }
 
@@ -106,6 +116,8 @@ static void fresh_director(void) {
     resume_screensaver = false;
     react_anim = NULL;
     joy_pending = false;
+    saver_turn = 0;
+    fake_party_reset();
     ClawdTuning fast;
     clawd_tuning_fast(&fast);
     clawd_tuning_set_base(&fast);
@@ -139,17 +151,19 @@ static void fuzz(uint32_t seed, uint32_t total_ms, bool has_big, int has_perform
         switch (fz_next() % 18) {
         case 0: case 1:  world.activity = (int)fz_range(0, 3); break;
         case 2:          world.activity = 3; break;
-        case 3: case 4:  sig.event_fired = true; sig.event = "psb"[fz_next() % 3]; sig.event_seq = ++es; break;
+        case 3: case 4:  sig.event_fired = true; sig.event = "psbtf"[fz_next() % 5]; sig.event_seq = ++es; break;
         case 5:          pct += 1; d.session_pct = pct; break;
         case 6:          sig.session_reset = true; pct = 0; d.session_pct = pct; break;
         case 7:          director_alert("needs you"); continue;
         case 8:          director_alert_clear(); continue;
-        case 9: case 10: director_tap((int)fz_range(0, 479)); continue;
+        case 9:          director_tap((int)fz_range(0, 479), (int)fz_range(0, 479)); continue;
+        case 10:         director_tap((int)fz_range(0, 479), (int)fz_range(0, FAKE_HEADER_H - 1)); continue;   // the header
         case 11:         (void)director_button(true); continue;
         case 12:         world.meters_live = fz_next() % 4 != 0; continue;
         case 13: {
-            static const char* const BEATS[] = { "show", "screensaver", "lurk", "peek", "joy", "home" };
-            director_debug(BEATS[fz_next() % 6]);
+            static const char* const BEATS[] = { "show", "screensaver", "lurk", "peek", "joy", "home",
+                                                 "pet", "pass", "fail", "screensaver 2" };
+            director_debug(BEATS[fz_next() % 10]);
             continue;
         }
         case 14:         director_set_liveliness((int)fz_range(1, 5)); continue;
@@ -229,7 +243,7 @@ static void test_no_nonsense_sits_still_through_everything_but_taps(void) {
         }
     }
     TEST_ASSERT_FALSE_MESSAGE(moved, "he left his seat or a beat started");
-    director_tap(300);                               // a tap still gets the peek
+    director_tap(300, 300);                          // a tap still gets the peek
     run_for(3000);
     TEST_ASSERT_EQUAL_STRING("peek", director_beat_name());
     director_set_liveliness(CLAWD_LIVELINESS_DEFAULT);
@@ -275,7 +289,7 @@ static void attention_off(bool has_big) {
     TEST_ASSERT_EQUAL_STRING("attention", director_beat_name());
     TEST_ASSERT_TRUE(attention_on);
     TEST_ASSERT_TRUE(fake_corner_seated_still());
-    director_tap(200);                           // the alert itself still works
+    director_tap(200, 200);                      // the alert itself still works
     TEST_ASSERT_TRUE(director_take_dismissed());
     run_for(5000);
     TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
@@ -410,6 +424,171 @@ static void test_page_waits_for_the_face(void) {
     director_page_closed();
 }
 
+// ─── Pet mode ────────────────────────────────────────────────────────────────
+// A tap on the header: he ducks out, the face comes up and the pet has it;
+// the header again, a button, an alert, being left alone or the link
+// dropping each end it on the meters with him back in his seat.
+static void enter_pet(void) {
+    director_tap(240, 20);
+    TEST_ASSERT_EQUAL_STRING("pet", director_beat_name());
+    run_for(4000);
+    TEST_ASSERT_TRUE_MESSAGE(fake_pet_active(), "the pet has the face");
+    TEST_ASSERT_FALSE(fake_on_screen().corner);
+}
+
+static void assert_back_home(void) {
+    TEST_ASSERT_FALSE(fake_pet_active());
+    run_for(6000);
+    TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+    TEST_ASSERT_FALSE(fake_on_screen().face);
+    TEST_ASSERT_TRUE(fake_on_screen().corner);
+    assert_one_clawd();
+}
+
+static void test_pet_mode_is_the_one_clawd(void) {
+    world.has_big = true;
+    fresh_director();
+    enter_pet();
+    director_tap(240, 300);                       // a tap on the face is the pet's, not "show me the meters"
+    run_for(1000);
+    TEST_ASSERT_TRUE(fake_pet_active());
+    director_tap(100, 10);                        // the header: back to the meters
+    assert_back_home();
+
+    enter_pet();
+    TEST_ASSERT_FALSE(director_button(true));     // a button
+    assert_back_home();
+
+    enter_pet();
+    director_alert("needs you");                  // an alert outranks it
+    TEST_ASSERT_FALSE(fake_pet_active());
+    run_for(3000);
+    TEST_ASSERT_EQUAL_STRING("attention", director_beat_name());
+    director_alert_clear();
+    run_for(6000);
+    assert_one_clawd();
+
+    fresh_director();
+    enter_pet();
+    world.activity = 1;                           // Claude working: no screensaver once it's over
+    run_for(22000);                               // left alone (the fake pet is done after 20 s)
+    assert_back_home();
+    world.activity = 0;
+
+    enter_pet();
+    world.meters_live = false;                    // the link drops: the hint, not the pet
+    run_for(100);
+    TEST_ASSERT_FALSE(fake_pet_active());
+    run_for(6000);
+    world.meters_live = true;
+    director_tap(240, 20);                        // stale meters: a header tap is a peek
+    run_for(10);
+    assert_one_clawd();
+}
+
+static void test_header_tap_on_stale_meters_is_a_peek(void) {
+    fresh_director();
+    world.meters_live = false;
+    director_tap(240, 20);
+    TEST_ASSERT_EQUAL_STRING("peek", director_beat_name());
+    world.meters_live = true;
+}
+
+// ─── Test runs ───────────────────────────────────────────────────────────────
+static void test_event(char e, uint32_t* es) {
+    UsageData d = live_payload();
+    SignalsUpdate sig = no_signal();
+    sig.event_fired = true;
+    sig.event = e;
+    sig.event_seq = ++*es;
+    send(d, sig);
+}
+
+// On the meters: a pass is the green glow, confetti and his fanfare; a fail
+// the red glow and the magnifier; in pet mode the face cheers or hunts; with
+// the face down for the screensaver only the glow and the confetti show.
+static void test_test_runs_party_and_hunt(void) {
+    world.has_big = false;
+    fresh_director();
+    uint32_t es = 0;
+    test_event('t', &es);
+    TEST_ASSERT_EQUAL_INT(1, fake_glows());
+    TEST_ASSERT_EQUAL_HEX32(theme_hex(TH_GREEN), fake_glow_rgb());
+    TEST_ASSERT_EQUAL_INT(1, fake_confetti());
+    TEST_ASSERT_EQUAL_STRING("trumpet", fake_last_act);
+    TEST_ASSERT_TRUE(fake_corner_acting());
+    run_for(5000);
+    test_event('f', &es);
+    TEST_ASSERT_EQUAL_HEX32(theme_hex(TH_RED), fake_glow_rgb());
+    TEST_ASSERT_EQUAL_INT(1, fake_confetti());
+    TEST_ASSERT_EQUAL_STRING("magnifier", fake_last_act);
+    run_for(5000);
+    fake_last_act = NULL;
+    test_event('f', &es);                          // still failing, soon after: the glow only
+    TEST_ASSERT_EQUAL_INT(3, fake_glows());
+    TEST_ASSERT_NULL(fake_last_act);
+    run_for(5000);
+
+    enter_pet();
+    test_event('t', &es);                          // fixed, in pet mode: the face cheers
+    TEST_ASSERT_EQUAL_INT(1, fake_pet_cheers());
+    TEST_ASSERT_EQUAL_INT(2, fake_confetti());
+    TEST_ASSERT_TRUE(fake_pet_active());
+    test_event('f', &es);
+    TEST_ASSERT_EQUAL_INT(1, fake_pet_hunts());
+    director_tap(0, 0);
+    assert_back_home();
+
+    director_set_liveliness(1);                    // No-nonsense: the glow, nothing else
+    const int conf = fake_confetti(), glows = fake_glows();
+    fake_last_act = NULL;
+    test_event('t', &es);
+    TEST_ASSERT_EQUAL_INT(conf, fake_confetti());
+    TEST_ASSERT_EQUAL_INT(glows + 1, fake_glows());
+    TEST_ASSERT_NULL(fake_last_act);
+    director_set_liveliness(CLAWD_LIVELINESS_DEFAULT);
+    assert_one_clawd();
+}
+
+// ─── Effect screensavers ─────────────────────────────────────────────────────
+// The screensaver takes turns: the face, then each effect. An effect starts
+// only once he's off screen, changes now and then, and goes as he walks back.
+static void test_screensaver_takes_turns_with_effects(void) {
+    world.has_big = true;
+    fresh_director();
+    for (int turn = 0; turn <= SAVER_COUNT; turn++) {
+        run_for(15 * 1000 + 3000);                 // quiet: the screensaver starts
+        TEST_ASSERT_EQUAL_STRING("screensaver", director_beat_name());
+        const OnScreen s = fake_on_screen();
+        if (turn == 0) {
+            TEST_ASSERT_TRUE(s.face);
+            TEST_ASSERT_FALSE(fake_saver_active());
+        } else {
+            TEST_ASSERT_TRUE(fake_saver_active());
+            TEST_ASSERT_EQUAL_INT(turn - 1, fake_saver_kind());
+            TEST_ASSERT_EQUAL_INT(0, fake_clawds(s));
+            if (turn == 1) {
+                run_for(clawd_tuning().saver_switch_ms);   // it changes effect
+                TEST_ASSERT_EQUAL_INT(1, fake_saver_kind());
+            }
+        }
+        director_tap(240, 300);                    // you're back
+        run_for(100);
+        TEST_ASSERT_FALSE(fake_saver_active());
+        run_for(6000);
+        TEST_ASSERT_EQUAL_STRING("home", director_beat_name());
+        assert_one_clawd();
+    }
+    TEST_ASSERT_TRUE(director_debug("screensaver 3"));   // QA: a given style
+    run_for(3000);
+    TEST_ASSERT_EQUAL_INT(2, fake_saver_kind());
+    director_alert("needs you");                   // an alert takes it down
+    TEST_ASSERT_FALSE(fake_saver_active());
+    director_alert_clear();
+    run_for(6000);
+    assert_one_clawd();
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_screensaver_calm_dip_keeps_one_clawd);
@@ -429,5 +608,9 @@ int main(int, char**) {
     RUN_TEST(test_short_attention_animation_with_full_size_sprite);
     RUN_TEST(test_short_attention_animation_without_full_size_sprite);
     RUN_TEST(test_fuzz_one_clawd_at_every_attention_animation);
+    RUN_TEST(test_pet_mode_is_the_one_clawd);
+    RUN_TEST(test_header_tap_on_stale_meters_is_a_peek);
+    RUN_TEST(test_test_runs_party_and_hunt);
+    RUN_TEST(test_screensaver_takes_turns_with_effects);
     return UNITY_END();
 }
