@@ -134,7 +134,8 @@ Adding or renaming a key means changing both sides: `clawdmeter-core`'s
   attack/strike/ring) in code, docs, commits and PRs. Never name or hint at
   what inspired it, and add no credit line for it.
 - **Clawd sprite art comes only from the official animations** in
-  `research/clawd-official/`; never draw or retouch sprite frames. The
+  `research/clawd-official/`, plus credited, licensed fan sets in
+  `research/clawd-fan/` (clawd-tank, MIT); never draw or retouch sprite frames. The
   palette's Clawd colour swaps his body orange at draw time
   (`theme_clawd_art`) and leaves the frames as published. The large
   screensaver face is the exception: it's built from LVGL shapes and may be

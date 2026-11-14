@@ -97,6 +97,14 @@ portable archives, and Nix setup.
 - [Clawd's director](docs/clawd-director.md): behavior and character rules.
 - [Legacy daemon parity](docs/daemon-parity.md): upgrade steps and implementation differences.
 
+## Credits
+
+Some of Clawd's scenes (typing, thinking, debugging, the wizard, sleeping and
+more) are fan animations from [clawd-tank](https://github.com/marciogranzotto/clawd-tank)
+by Marcio Granzotto ([@marciogranzotto](https://github.com/marciogranzotto)),
+MIT licensed (`research/clawd-fan/clawd-tank/LICENSE`), first brought to a
+Clawdmeter by [unrarp/Clawdmeter](https://github.com/unrarp/Clawdmeter).
+
 ## Licensing gray area warning
 
 The software in this repository uses and adheres to the Anthropic brand guidelines and uses the same proprietary fonts that Anthropic has a license for but this software uses without permission as well as using assets from Anthropic such as the copyrighted Clawd mascot so even though the code in this repo is non-proprietary I will not license it myself under a copyleft license since this repo includes proprietary fonts and copyrighted assets. Please be aware of this if you fork or copy the code from this repo. **You have been warned!**

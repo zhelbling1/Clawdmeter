@@ -63,10 +63,11 @@ static uint8_t  big_act = 0;           // 0 waving, 1 pointing (attention, eithe
 static ClawdRng rng;
 
 // Per mood group: how long he sits between acts and which acts he picks.
-// "lurking" = the walk-off / full-size lurk / walk-back trip.
+// "lurking" = the walk-off / full-size lurk / walk-back trip. "tank idle" is
+// the clawd-tank fan clip of him idling (looks around, yawns, stretches).
 static const char* const ACTS_BY_RATE[4][4] = {
-    { "pointing", "lurking", NULL,       NULL      },   // idle: sparse, sneaky
-    { "waving",   "lurking", "pointing", NULL      },   // normal
+    { "pointing", "lurking", "tank idle", NULL     },   // idle: sparse, sneaky
+    { "waving",   "lurking", "pointing", "tank idle" }, // normal
     { "waving",   "dancing", "lurking",  NULL      },   // active
     { "dancing",  "waving",  "dancing",  "lurking" },   // heavy: can't sit still
 };
@@ -78,7 +79,7 @@ static const uint16_t HURRY_PCT = 250;        // hurrying home from a lurk trip
 static const char* const TALL_FALLBACK = "dancing";
 // Everything the corner buffer must fit.
 static const char* const CORNER_ANIMS[] = {
-    "walking", "waving", "pointing", "dancing", "jumping happy",
+    "walking", "waving", "pointing", "dancing", "jumping happy", "tank idle",
 };
 
 // ─── Rendering ───────────────────────────────────────────────────────────────

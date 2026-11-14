@@ -5,6 +5,7 @@
 #include "perf.h"
 #include "splash_geometry.h"
 #include "hal/board_caps.h"
+#include "hal/power_hal.h"
 #include <Arduino.h>
 #include <string.h>
 #include <esp_heap_caps.h>
@@ -27,17 +28,27 @@ static lv_image_dsc_t dsc;
 static bool      shown = false;                // img not hidden
 
 // ─── Mood groups ─────────────────────────────────────────────────────────────
+// "tank …" are the clawd-tank fan clips (research/clawd-fan/clawd-tank/):
+// Clawd at work (typing, thinking, debugging) and having fun with it in the
+// Active set, heavy lifting in the Heavy set, resting in the Idle set.
 #define GROUP_COUNT 4
-#define GROUP_MAX   4
+#define GROUP_MAX   11
 static const char* const GROUP_NAMES[GROUP_COUNT][GROUP_MAX] = {
-    { "magnifier", "walking", "pointing", "lurking" },        // idle / sleepy
+    { "magnifier", "walking", "pointing", "lurking",          // idle / sleepy
+      "tank idle", "tank sleeping" },
     { "crab walking", "waving", "trumpet", "basketball" },    // normal pace
-    { "laptop", "dancing", "skateboard", "soccer" },          // active
-    { "racing car", "cloud", "sailing scene", "jumping happy" }, // heavy burn
+    { "laptop", "dancing", "skateboard", "soccer",            // active
+      "tank typing", "tank thinking", "tank debugger",
+      "tank grooving", "tank conducting", "tank juggling", "tank wizard" },
+    { "racing car", "cloud", "sailing scene", "jumping happy", // heavy burn
+      "tank carrying", "tank builder", "tank building" },
 };
 // The screensaver's calm dips: gentle Idle-group scenes only (lurking is a
 // corner act and pointing is his "noticing" gesture).
-static const char* const CALM_NAMES[] = { "magnifier", "walking" };
+static const char* const CALM_NAMES[] = { "magnifier", "walking", "tank idle", "tank sleeping" };
+// On a board running low on its own battery, the calm dip is this one.
+static const char* const CALM_LOW_BATTERY = "tank low battery";
+#define LOW_BATTERY_PCT 20
 
 // ─── Performer ───────────────────────────────────────────────────────────────
 enum PerfState { P_OFF, P_STAND, P_WALK, P_SCENE, P_CHOREO };
@@ -354,10 +365,22 @@ void performer_perform(int idx, uint32_t loop_ms) {
 static ClawdRng rng;
 static bool rng_seeded = false;
 
+// Running on its own battery, and it's low (never on USB power or a board
+// without a battery).
+static bool low_battery(void) {
+    if (!board_caps().has_battery || power_hal_is_vbus_in()) return false;
+    const int pct = power_hal_battery_pct();
+    return pct >= 0 && pct <= LOW_BATTERY_PCT;
+}
+
 void performer_perform_group(int group, uint32_t loop_ms, bool calm) {
     if (!img) return;
     if (!rng_seeded) { clawd_rng_seed(&rng, millis() ^ 0x57A6E); rng_seeded = true; }
     if (group < 0 || group >= GROUP_COUNT) group = 0;
+    if (calm && low_battery()) {
+        const ClawdAnim* lb = clawd_anim(CALM_LOW_BATTERY);
+        if (lb) { last_calm = lb->name; scene_start(lb, loop_ms); return; }
+    }
     const char* const* names = calm ? CALM_NAMES : GROUP_NAMES[group];
     const int n = calm ? (int)(sizeof(CALM_NAMES) / sizeof(CALM_NAMES[0])) : GROUP_MAX;
     const char*& last = calm ? last_calm : last_show;

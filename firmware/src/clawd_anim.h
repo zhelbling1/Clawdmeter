@@ -3,7 +3,7 @@
 
 // Read-only view of the official Clawd animations (splash_animations.h).
 //
-// splash_animations.h defines ~400 KB of `static const` frame data, so it may
+// splash_animations.h defines ~810 KB of `static const` frame data, so it may
 // only be included by ONE translation unit (clawd_anim.cpp); every other
 // module (performer, corner mascot, director) reaches the art through this view.
 //
@@ -19,7 +19,8 @@
 struct ClawdAnim {
     const char*     name;
     uint8_t         w, h;              // frame size, cells
-    uint8_t         ox, oy;            // crop origin on the 55x37 art stage
+    uint8_t         ox;                // crop origin on the 55x37 art stage
+    int8_t          oy;                //   (negative: art above the stage, fan clips)
     uint16_t        frame_count;
     uint16_t        loop_start, loop_end;
     const uint16_t* palette;           // RGB565, index 0 = background; Clawd in TH_CLAWD

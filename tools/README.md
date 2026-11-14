@@ -29,6 +29,18 @@ See `research/clawd-official/CLAUDE.md` for asset provenance and the format
 details, and `--in` / `--out` to override paths. Rebuild firmware after
 running.
 
+The converter also reads the clawd-tank fan clips (`TANK_ANIMS`, MIT, by
+@marciogranzotto): GIFs in `research/clawd-fan/clawd-tank/`, rendered from its
+SVGs by
+
+```bash
+node tools/render_clawd_tank.js     # needs Node 22+ and Chrome/Chromium/Edge
+```
+
+which loads each SVG in headless Chrome, pauses its CSS animations frame by
+frame and samples cell centres at 2 cells per SVG unit. Method, scale and
+the clip list are in that folder's README.
+
 ## Icons
 
 ```bash

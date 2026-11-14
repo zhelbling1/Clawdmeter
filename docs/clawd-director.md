@@ -15,12 +15,12 @@ what you want (see "A tap on the meters" below).
 | `firmware/src/clawd_director.{h,cpp}` | Owns the rooms and runs the beats. It is the only module that decides what Clawd does next. |
 | `firmware/src/clawd_policy.{h,cpp}` | Pure decision rules, unit-tested in `test/test_clawd_policy`: show gate and show group, screensaver gate, where attention returns to, how long a reaction waits for him, the corner seat's headroom, turn tracker, no-repeat picker, jitter, the resting face's rhythm, what a tap on the meters earns (the peek, how he sets off), where the face looks and how long it stays curious, and all tunables (`ClawdTuning`). |
 | `firmware/src/mascot.{h,cpp}` | Clawd on the meters: the corner Clawd in his seat, plus the full-size sprite used for the lurk trip and the attention walk-on. Does in-room secondary action (idle acts, lurk trips) when the director allows it. |
-| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM only. |
+| `firmware/src/performer.{h,cpp}` | Clawd performing on the meters: the official scenes (and the clawd-tank fan clips, below) at full size on a 60×60-cell grid, in front of the meters. He stands, walks on and off through either edge, or performs a scene. PSRAM only. |
 | `firmware/src/face.{h,cpp}` | The #198 face: a field on `lv_layer_top()` with the eyes as small LVGL rectangles on it. It is the screensaver and the held peek. |
 | `firmware/src/face_motion.{h,cpp}` | The face's rise and drop as a pure function of time (vertical only, one size: overshoot and settle, anticipation, follow-through; see "The face's motion"), unit-tested in `test/test_face_motion`. |
 | `firmware/src/field.{h,cpp}` | A flat-colour shape on an overlay layer (a rectangle plus two small extra rectangles) that redraws only the strips that change colour (see "Redraw cost and frame rate"). The face is a field. |
 | `firmware/src/perf.{h,cpp}` | The `perf` serial command: refresh count, timing and pixels sent for the last face rise, its settle, face drop and performance. |
-| `firmware/src/clawd_anim.{h,cpp}` | Read-only view of the official animations. It is the only translation unit that includes `splash_animations.h` (about 400 KB of static data). |
+| `firmware/src/clawd_anim.{h,cpp}` | Read-only view of the official animations and the clawd-tank fan clips. It is the only translation unit that includes `splash_animations.h` (about 810 KB of static data). |
 | `firmware/src/ui.{h,cpp}` | Draws the meters only: cards, clock, status line, battery, the seat. Stale data dims the meters (see below); it never adds a second creature. |
 
 `main.cpp` feeds the director per payload (`director_on_payload` after
@@ -91,10 +91,10 @@ passed. Beat changes always print; every step prints too after
 
 | Beat | Trigger | Steps |
 |---|---|---|
-| `home` | default | Corner autonomy on: jittered idle gaps (±40 % of 10 / 7 / 5 / 3.5 s by mood), mood-picked acts, never the same act twice running, and lurk trips (PSRAM). Also checks the gates below. |
+| `home` | default | Corner autonomy on: jittered idle gaps (±40 % of 10 / 7 / 5 / 3.5 s by mood), mood-picked acts (tank idle among them in the Idle and Normal moods), never the same act twice running, and lurk trips (PSRAM). Also checks the gates below. |
 | `corner` | notice, wave, joy, or after a transition | Waits for the commanded corner act or walk to finish, then `home`. |
 | `show` | `a == 3` held for 5 min; at most one per 15 min; hooks seen; meters live | Points at the bar (or, if he's out on a lurk trip, heads straight out), walks off left at 1.5×, walks back on full size at 1.5×, one scene (loop held 16 s, so about 20 s), waves, walks off left, and the corner Clawd walks back in to his seat. Without the performer (no PSRAM): points, then dances twice (jumps for joy twice when usage is Heavy) and waves, all in his seat. |
-| `screensaver` | 10 min with no engagement; needs hooks seen or a window that hasn't started (spend-capped and `week` accounts have no window, so they need hooks); meters live | Walks off through the nearest edge (a lurk trip finishes its peek first), face rises and rests (blinks every 2–6 s, about one in five a double, glances where the far eye travels 1.5×). Every 3–5 min, a calm dip: the face drops onto the meters, he walks on, plays one calm scene (magnifier or walking, alternating) and walks off, then the face rises and he rests again. Without the performer the corner Clawd walks back to his seat, sits for the scene's length and walks off again. |
+| `screensaver` | 10 min with no engagement; needs hooks seen or a window that hasn't started (spend-capped and `week` accounts have no window, so they need hooks); meters live | Walks off through the nearest edge (a lurk trip finishes its peek first), face rises and rests (blinks every 2–6 s, about one in five a double, glances where the far eye travels 1.5×). Every 3–5 min, a calm dip: the face drops onto the meters, he walks on, plays one calm scene (magnifier, walking, tank idle or tank sleeping, never the same twice running; tank low battery instead when the board runs on a low battery) and walks off, then the face rises and he rests again. Without the performer the corner Clawd walks back to his seat, sits for the scene's length and walks off again. |
 | `face-home` | tap, prompt, button or attention while the screensaver face is up; a tap, attention or the end of its curiosity while the peek face is up | If woken by a prompt or tapped during a peek, he blinks first (noticing), then the face drops into the meters, and the corner hurries home at 1.5×. |
 | `run-home` | tap or attention during a performance; a tap, prompt, button or usage moving during a calm dip | The scene releases to the idle pose on the spot, holds 200 ms, and he runs off left, ramping from 1.5× to 3× over 400 ms. Once he's gone, the corner walks home at 1.5×. |
 | `peek` | any tap on the meters (`home` or `corner`), live or stale (below) | Seated: a startled hop (`jumping` from its crouch, 2×), then he ducks out through the nearest edge at 4×; already moving or out: straight out at 4×. The face rises, eyes glance toward the tap's x and hold 1.6–2.4 s, a blink (30 % double), the look comes back to you, and the face stays up, curious, for 5 min: resting like the screensaver face (blinks every 2–6 s, some double), its glances going back toward the tap most of the time. Then it goes back on its own; a tap sends it back right away (with the acknowledging blink). Both go through `face-home`: the drop, and he walks back to his seat at 1.5×. (below: what else happens while it's up) |
@@ -103,8 +103,11 @@ passed. Beat changes always print; every step prints too after
 **Which scene a show plays.** The trigger (activity 3) lifts the live mood
 group to Heavy, so the show reads the usage-only base group instead, floored
 at Active (`clawd_show_group`): idle-to-active usage plays the Active set
-(laptop, dancing, skateboard, soccer), real burn plays the Heavy set (racing
-car, cloud, sailing, jumping happy). Shows never repeat the previous show's
+(laptop, dancing, skateboard, soccer, and the fan clips of him at work and
+having fun with it: tank typing, thinking, debugger, grooving, conducting,
+juggling, wizard), real burn plays the Heavy set (racing car, cloud, sailing,
+jumping happy, and the heavy-lifting fan clips: tank carrying, builder,
+building). Shows never repeat the previous show's
 scene, and calm dips never repeat the previous calm scene (tracked separately,
 so a calm dip doesn't reset the show's no-repeat memory).
 
@@ -218,6 +221,30 @@ him.
 event, any activity level above 0 (tool calls are hook events too), a tap, a
 button, an alert, or a real sample where session % went up. Usage going up
 also wakes the screensaver, which covers the slow-clock-only case.
+
+## Fan clips (clawd-tank)
+
+Thirteen clips ("tank …" in `splash_animations.h`, category `fan`) come from
+@marciogranzotto's MIT-licensed [clawd-tank](https://github.com/marciogranzotto/clawd-tank)
+SVGs, the set unrarp/Clawdmeter played on its splash screen. They're rendered
+onto Clawd's cell grid (1 SVG unit = 2 cells, one official body pixel) and
+converted like the official art; provenance and method are in
+`research/clawd-fan/clawd-tank/README.md`. They play through the same
+players, by meaning:
+
+| Where | Clips |
+|---|---|
+| Show, Active set (Claude at work) | tank typing, tank thinking, tank debugger, tank grooving, tank conducting, tank juggling, tank wizard |
+| Show, Heavy set (heavy lifting) | tank carrying, tank builder, tank building |
+| Calm dip (he's resting while you're away) | tank idle, tank sleeping |
+| Calm dip on a low battery | tank low battery, instead of the others, when `BoardCaps.has_battery`, no USB power and ≤ 20 % (`performer.cpp`) |
+| Corner act (Idle and Normal moods) | tank idle, the only one short enough for the seat's headroom (23 rows); on the C6 it's the one fan clip you see |
+
+He's drawn to clawd-tank's own proportions, so he's a little bigger than the
+official Clawd (30 cells across with arms, against 24) and the cut from the
+official idle pose into a fan clip and back changes his size for a moment.
+Tall clips (the wizard's hat, the thought bubble, the sleeping Zs) use the
+performer grid's 11 rows above the art stage: their `oy` is negative.
 
 ## Animation principles and implementation
 
@@ -345,7 +372,8 @@ a board capability, with no NVS override, desktop setting, or serial toggle.
 ## Boards without PSRAM (C6)
 
 - Corner Clawd: animated. Its buffer, sized for the largest corner act
-  (jumping happy, 28×30 cells × 3 px, about 23 KB), falls back to internal RAM.
+  (jumping happy's 30 rows by tank idle's 36 columns, × 3 px, about 29 KB),
+  falls back to internal RAM.
 - Face: plain LVGL objects, the same as on S3.
 - No performer (its buffer is about 690 KB): a show is corner acts (pointing,
   dancing or jumping happy twice, a wave) and a calm dip is the corner Clawd
