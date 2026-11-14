@@ -14,5 +14,117 @@
     "ms": 5940,
     "colours": 9,
     "kb": 40
+  },
+  {
+    "file": "Clawd-Dougie.gif",
+    "name": "the dougie",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The Dougie, the 2010-era dance craze: hand sliding over the side of the head, leaning and rocking side to side; backwards fitted cap and gold chain.",
+    "frames": 26,
+    "ms": 4560,
+    "colours": 11,
+    "kb": 25.4
+  },
+  {
+    "file": "Clawd-Bernie.gif",
+    "name": "the bernie",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      12,
+      19
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The Bernie lean, the late-2010s party dance: leaning way back, arms loose, swaying; sunglasses and a loud open shirt.",
+    "frames": 31,
+    "ms": 5190,
+    "colours": 13,
+    "kb": 39.4
+  },
+  {
+    "file": "Clawd-Jerk.gif",
+    "name": "the jerk",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      10,
+      17
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The Jerk, the late-2000s West Coast street dance: kicking one foot out while jerking the body back, stepping back and rocking forward; skinny jeans and bright high-tops.",
+    "frames": 27,
+    "ms": 4670,
+    "colours": 13,
+    "kb": 25.6
+  },
+  {
+    "file": "Clawd-CrankThat.gif",
+    "name": "crank that",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      9,
+      19
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The 2007 \"Crank That\" dance craze: the crank, the jump-and-lean on one leg and the flying superhero punch; an oversized white tee and a bucket hat.",
+    "frames": 27,
+    "ms": 5040,
+    "colours": 12,
+    "kb": 29.2
+  },
+  {
+    "file": "Clawd-ArmShuffle.gif",
+    "name": "arm shuffle",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      12,
+      19
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The famous late-80s music-video dance: side-to-side shuffle with bent arms swinging in time; a ginger quiff and a trench coat.",
+    "frames": 28,
+    "ms": 5070,
+    "colours": 13,
+    "kb": 28.2
+  },
+  {
+    "file": "Clawd-ZombieDance.gif",
+    "name": "zombie dance",
+    "mood": "active",
+    "rows": 37,
+    "loop": [
+      12,
+      19
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The famous early-80s horror music video dance: full moon, zombie shuffle, sideways claw dance, shoulder shrugs; red jacket with black V stripes and shoulder pads.",
+    "frames": 28,
+    "ms": 5150,
+    "colours": 12,
+    "kb": 33.3
+  },
+  {
+    "file": "Clawd-WreckingBall.gif",
+    "name": "wrecking ball",
+    "mood": "heavy",
+    "rows": 48,
+    "loop": [
+      8,
+      13
+    ],
+    "credit": "Made for this fork; AI-drawn with the originals kit (research/clawd-fan/originals/kit).",
+    "references": "The 2013 power-ballad music video: a giant wrecking ball on a chain, ridden while hugging the chain; short platinum hair, one tear.",
+    "frames": 21,
+    "ms": 4070,
+    "colours": 12,
+    "kb": 37.4
   }
 ]
