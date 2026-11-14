@@ -909,7 +909,7 @@ def load_anims():
     for m in re.finditer(r"static const uint(?:8|16)_t (\w+)\[\d+\] = \{(.*?)\};", txt, re.S):
         arrays[m.group(1)] = [int(v, 0) for v in re.findall(r"0x[0-9A-Fa-f]+|\d+", m.group(2))]
     _anims = {}
-    row = re.compile(r'\{"([^"]+)", "\w+", (\d+), (\d+), (\d+), (\d+), (\d+), (\d+), (\d+), (\d+), '
+    row = re.compile(r'\{"([^"]+)", "[^"]+", (\d+), (\d+), (\d+), (-?\d+), (\d+), (\d+), (\d+), (\d+), '
                      r'(\w+), (\w+), (\w+)\}')
     for m in row.finditer(txt):
         name = m.group(1)

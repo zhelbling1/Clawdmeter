@@ -145,8 +145,10 @@ an official but unlisted persona GIF.
 **The originals** (this fork's pop-culture gag scenes,
 `research/clawd-fan/originals/`, category `original <mood>` in the header)
 are built only where `CLAWD_ORIGINALS` is set: the envs with a 16 MB or larger
-flash (6.25 MB app slots), plus `sim` and `native`; the 8 MB and 4 MB boards
-leave them out. They aren't in the tables: `anim_pool` appends each one to
+flash (6.25 MB app slots) whose performer can play them, plus `sim` and
+`native`. The 8 MB and 4 MB boards leave them out, and so do the 1.8" C6 (no
+PSRAM and no direct performer: its shows are corner acts) and the
+minimal-UI Freenove board. They aren't in the tables: `anim_pool` appends each one to
 the pool of its catalog mood (active to Active, heavy to Heavy, calm to the
 calm dips), and the performer picks from those pools. In the button cycle
 they come right after the official scenes.

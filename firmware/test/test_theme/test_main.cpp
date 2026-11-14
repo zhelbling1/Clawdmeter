@@ -10,15 +10,16 @@ void setUp(void) {}
 void tearDown(void) {}
 
 // The live palettes the sprites draw with (clawd_anim.cpp), copied out.
-static uint16_t art[64][CLAWD_PALETTE_SIZE];
+#define ART_MAX 128
+static uint16_t art[ART_MAX][CLAWD_PALETTE_SIZE];
 static void snapshot(void) {
-    for (int i = 0; i < clawd_anim_count() && i < 64; i++)
+    for (int i = 0; i < clawd_anim_count() && i < ART_MAX; i++)
         memcpy(art[i], clawd_anim_at(i)->palette, sizeof(art[i]));
 }
 
 static void test_default_clawd_keeps_the_official_colours(void) {
     TEST_ASSERT_EQUAL_HEX16(CLAWD_ART_BODY, theme_rgb565(THEME_DEFAULTS[TH_CLAWD]));
-    TEST_ASSERT_TRUE(clawd_anim_count() > 0 && clawd_anim_count() <= 64);
+    TEST_ASSERT_TRUE(clawd_anim_count() > 0 && clawd_anim_count() <= ART_MAX);
     snapshot();
     bool body = false;
     for (int i = 0; i < clawd_anim_count(); i++)
