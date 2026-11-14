@@ -24,15 +24,12 @@ const char* const CALM_NAMES[CALM_COUNT] = {
     "fm listening", "space", "tank idle", "tank sleeping",
 };
 
-// ─── The pools ───────────────────────────────────────────────────────────────
-// Built once, on first use. Slot GROUP_COUNT is the calm dips.
-#define ORIG_MAX 32
-#define POOL_MAX (GROUP_MAX + ORIG_MAX)
-static const char* pools[GROUP_COUNT + 1][POOL_MAX];
-static int         pool_n[GROUP_COUNT + 1];
-static bool        pools_built = false;
+#ifndef CLAWD_ORIGINALS   // set per env in platformio.ini
+#define CLAWD_ORIGINALS 0
+#endif
 
-// Which pool an original of this mood joins; -1 for none.
+// Which pool an original of this mood joins; -1 for none. Slot GROUP_COUNT
+// is the calm dips.
 static int mood_slot(const char* mood) {
     if (!mood) return -1;
     if (strcmp(mood, "active") == 0) return 2;
@@ -40,6 +37,17 @@ static int mood_slot(const char* mood) {
     if (strcmp(mood, "calm") == 0) return GROUP_COUNT;
     return -1;
 }
+
+// ─── The pools ───────────────────────────────────────────────────────────────
+// Built once, on first use. Without the originals there is nothing to add, so
+// the tables are the pools and no RAM is spent (the classic ESP32 boards are
+// short of it).
+#if CLAWD_ORIGINALS
+#define ORIG_MAX 32
+#define POOL_MAX (GROUP_MAX + ORIG_MAX)
+static const char* pools[GROUP_COUNT + 1][POOL_MAX];
+static int         pool_n[GROUP_COUNT + 1];
+static bool        pools_built = false;
 
 static void build_pools(void) {
     if (pools_built) return;
@@ -63,11 +71,21 @@ const char* const* anim_pool(int group, bool calm, int* n) {
     if (n) *n = pool_n[s];
     return pools[s];
 }
+#else
+const char* const* anim_pool(int group, bool calm, int* n) {
+    if (calm) {
+        if (n) *n = CALM_COUNT;
+        return CALM_NAMES;
+    }
+    if (n) *n = GROUP_MAX;
+    return GROUP_NAMES[group >= 0 && group < GROUP_COUNT ? group : 0];
+}
+#endif
 
 // ─── The cycle ───────────────────────────────────────────────────────────────
 // Built once, on first use: indices into the animation table (under 256).
 #define FLAT_COUNT (GROUP_COUNT * GROUP_MAX + CALM_COUNT)
-#define CYCLE_MAX  96
+#define CYCLE_MAX  (CLAWD_ORIGINALS ? 96 : 64)
 static uint8_t cycle[CYCLE_MAX];
 static int     cycle_n = -1;
 

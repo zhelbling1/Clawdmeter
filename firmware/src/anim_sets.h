@@ -26,8 +26,9 @@ extern const char* const CALM_NAMES[CALM_COUNT];
 // What the performer draws from: a group's names (or CALM_NAMES when `calm`)
 // followed by the originals of that mood (builds with CLAWD_ORIGINALS: this
 // fork's pop-culture scenes, research/clawd-fan/originals/), "active" ones in
-// group 2, "heavy" ones in group 3 and "calm" ones in the calm dips. No NULL
-// entries; *n is the count. Out-of-range groups give group 0.
+// group 2, "heavy" ones in group 3 and "calm" ones in the calm dips. *n is the
+// count. Without CLAWD_ORIGINALS it is the table itself, NULL slots included
+// (skip them, as clawd_pick_no_repeat does). Out-of-range groups give group 0.
 const char* const* anim_pool(int group, bool calm, int* n);
 
 // The cycle: every scene in GROUP_NAMES and CALM_NAMES that the animation
