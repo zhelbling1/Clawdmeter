@@ -13,15 +13,18 @@ and a contact sheet.
 
 Scripts in `movies/`; shared props and costume pieces (chopper, BMX,
 convertible, lava pool, code rain, bullets with ripples, moon, bats, tiny
-shades, open coat, tinted aviators, hoodie, Hawaiian shirt, cigarette holder,
-thumbs-up glove; some are unused since Moon bike was cut) in `movies/props_m1.js`.
+shades, open coat, trimmed coat and its floor-length drape, tinted aviators,
+hoodie, Hawaiian shirt, cigarette holder, thumbs-up glove; some are unused
+since Moon bike was cut) and the lean-back pose (`leanBack`: the official idle
+pose sheared back as whole rows and blocks, nothing redrawn) in
+`movies/props_m1.js`.
 
 | Scene | Script | Mood | References |
 |---|---|---|---|
-| Zed's dead | `movies/zeds_dead.js` | active | The chopper getaway from *Pulp Fiction* (1994): slicked hair, leather jacket, a raked chopper with ape-hanger bars, the two-word caption "ZED'S DEAD". |
-| Bullet time | `movies/bullet_time.js` | active | The slow-motion dodge from *The Matrix* (1999): tiny black shades, long black coat, falling green code, bullets with ripple trails. His "bend back" is the official squash pose, since his body can't be redrawn. |
+| Zed's dead | `movies/zeds_dead.js` | active | The chopper getaway from *Pulp Fiction* (1994): slicked hair, leather jacket, a raked chopper with ape-hanger bars, the two-word caption "ZED'S DEAD". The caption and the ride-off play once; the loop is only the calm cruise (road dashes, wind, a spring bob). |
+| Bullet time | `movies/bullet_time.js` | active | The slow-motion dodge from *The Matrix* (1999): tiny black shades, a long black coat cut open so his orange shows, falling green code, bullets with ripple trails crawling over him. The backbend is the official idle pose sheared back (head block rigid, torso rows stepped, knees forward, arm nubs moved as blocks), with the coat hanging to the floor behind him. |
 | Thumbs up in lava | `movies/lava_thumbs.js` | heavy | The molten-steel farewell from *Terminator 2: Judgment Day* (1991): leather jacket, dark shades, a slow sink and a last thumbs-up (a white cartoon glove). Slapstick: he pops back out fine. |
-| Bat country | `movies/bat_country.js` | heavy | The desert drive in *Fear and Loathing in Las Vegas* (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats, the caption "BAT COUNTRY". |
+| Bat country | `movies/bat_country.js` | heavy | The desert drive in *Fear and Loathing in Las Vegas* (1998): bucket hat, tinted aviators, cigarette holder, Hawaiian shirt, a red convertible, cartoon bats on slow paths (a 2.4 s loop) that never cross his hat, the caption "BAT COUNTRY". |
 
 All of these are caricature: costumes and situations only, no actor
 likenesses, no logos or studio marks, captions of two words.
