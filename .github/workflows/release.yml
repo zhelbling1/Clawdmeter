@@ -21,6 +21,10 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # A manual run for when a tag push doesn't start one. Pick the tag as the
+  # ref ("Use workflow from", or `gh workflow run release.yml --ref vX.Y.Z`);
+  # the envs job rejects any ref that isn't a version tag.
+  workflow_dispatch:
 
 permissions:
   contents: read
